@@ -1,0 +1,328 @@
+diff --git a/keepassxc-browser/options/options.css b/keepassxc-browser/options/options.css
+index 12c9cc8..bf40a90 100644
+--- a/keepassxc-browser/options/options.css
++++ b/keepassxc-browser/options/options.css
+@@ -166,6 +166,12 @@ table td:last-of-type {
+     color: var(--kpxc-text-color);
+ }
+ 
++.localvault .card { border-radius: 20px; box-shadow: none !important; }
++.localvault .card-header { padding: 14px 18px; border-bottom-color: var(--lv-line); }
++.localvault .card-body { padding: 18px; }
++.localvault main h2 { font-weight: 650; letter-spacing: -.025em; }
++.localvault .form-switch > .form-check-input:checked { background-color: var(--lv-accent) !important; }
++
+ .form-check-input:checked {
+     background-color: var(--kpxc-checkbox-color) !important;
+ }
+diff --git a/keepassxc-browser/options/options.html b/keepassxc-browser/options/options.html
+index 1c637d9..b4295fb 100644
+--- a/keepassxc-browser/options/options.html
++++ b/keepassxc-browser/options/options.html
+@@ -8,6 +8,7 @@
+     <link rel="stylesheet" href="../bootstrap/bootstrap.min.css">
+     <link rel="stylesheet" href="../fonts/fork-awesome.min.css">
+     <link rel="stylesheet" href="options.css">
++    <link rel="stylesheet" href="../css/localvault.css">
+     <link rel="icon" type="image/png" href="../icons/keepassxc_32x32.png" sizes="32x32">
+     <link rel="icon" type="image/png" href="../icons/keepassxc_64x64.png" sizes="64x64">
+     <link rel="icon" type="image/png" href="../icons/keepassxc_96x96.png" sizes="96x96">
+@@ -19,7 +20,7 @@
+     <script src="options.js"></script>
+     <script src="../common/translate.js" defer></script>
+   </head>
+-  <body class="pt-3 pb-5 no-transitions">
++  <body class="localvault pt-3 pb-5 no-transitions">
+     <div class="container-fluid">
+       <div class="row">
+         <nav class="col-md-3 col-lg-2 sidebar">
+diff --git a/keepassxc-browser/popups/popup.css b/keepassxc-browser/popups/popup.css
+index 8e38231..1caa2cc 100644
+--- a/keepassxc-browser/popups/popup.css
++++ b/keepassxc-browser/popups/popup.css
+@@ -214,3 +214,59 @@ code {
+         color: var(--kpxc-text-color) !important;
+     }
+ }
++
++body.localvault.popup-shell {
++    width: 400px;
++    padding: 16px 4px 20px;
++}
++
++.popup-shell > .container { gap: 12px; }
++.popup-shell #popup-alerts:empty { display: none; }
++.popup-shell #popup-alerts { margin-top: 0; }
++.popup-shell .settings {
++    align-items: center;
++    gap: 8px;
++    border: 1px solid var(--lv-line);
++    border-radius: 20px;
++    padding: 10px;
++    margin: 0;
++    background: var(--lv-tint);
++}
++.localvault-popup-brand {
++    display: flex;
++    align-items: center;
++    gap: 9px;
++    margin: 0 auto 0 0;
++    font-size: 16px;
++    font-weight: 700;
++}
++.localvault-popup-mark {
++    display: grid;
++    place-items: center;
++    width: 32px;
++    height: 32px;
++    border-radius: 11px;
++    background: var(--lv-accent);
++    color: var(--lv-on-accent);
++}
++.popup-shell :is(.alert, .credentials, #initial-state, #not-configured,
++    #need-reconfigure, #configured-not-associated, #configured-and-associated,
++    #error-encountered, #database-not-opened, #username-field-detected) {
++    border: 1px solid var(--lv-line);
++    border-radius: 16px;
++    padding: 14px;
++    overflow-wrap: anywhere;
++}
++.popup-shell :is(.credentials, #initial-state, #not-configured, #need-reconfigure,
++    #configured-not-associated, #configured-and-associated, #error-encountered,
++    #database-not-opened, #username-field-detected) { background: var(--lv-surface); }
++.popup-shell .alert-dismissible { padding-inline-end: 44px; }
++.popup-shell .loader { border-top-color: var(--lv-accent); }
++.popup-shell #login-filter {
++    border: 1px solid var(--lv-line);
++    border-radius: 999px;
++    padding: 7px 12px;
++}
++.popup-shell .list-group-item { padding: 9px 12px !important; }
++.popup-shell .list-group { --bs-list-group-border-color: var(--lv-line); }
++.popup-shell button { min-height: 32px; }
+diff --git a/keepassxc-browser/popups/popup.html b/keepassxc-browser/popups/popup.html
+index 5c8d5cb..3bd4e1e 100644
+--- a/keepassxc-browser/popups/popup.html
++++ b/keepassxc-browser/popups/popup.html
+@@ -4,9 +4,10 @@
+     <title data-i18n="popupTitle"></title>
+     <meta charset="UTF-8">
+     <link rel="stylesheet" href="../css/colors.css">
+-    <link rel="stylesheet" href="popup.css">
+     <link rel="stylesheet" href="../bootstrap/bootstrap.min.css">
+     <link rel="stylesheet" href="../fonts/fork-awesome.min.css">
++    <link rel="stylesheet" href="../css/localvault.css">
++    <link rel="stylesheet" href="popup.css">
+     <script src="../common/browser-polyfill.min.js"></script>
+     <script src="../common/global.js"></script>
+     <script src="../common/global_ui.js"></script>
+@@ -15,9 +16,13 @@
+     <script defer src="popup.js"></script>
+     <script defer src="../common/translate.js"></script>
+   </head>
+-  <body>
++  <body class="localvault popup-shell">
+     <div class="container">
+       <div id="settings" class="settings">
++        <h1 class="localvault-popup-brand">
++          <span class="localvault-popup-mark" aria-hidden="true"><i class="fa fa-lock"></i></span>
++          <span>LocalVault</span>
++        </h1>
+         <div class="action-buttons-area">
+           <button id="options-button" class="btn btn-sm btn-success" data-i18n="[title]popupSettingsText">
+             <i class="fa fa-cog" aria-hidden="true"></i>
+diff --git a/keepassxc-browser/popups/popup.js b/keepassxc-browser/popups/popup.js
+index 7bd02f2..f695827 100644
+--- a/keepassxc-browser/popups/popup.js
++++ b/keepassxc-browser/popups/popup.js
+@@ -159,9 +159,8 @@ const sendMessageToTab = async function(message) {
+         });
+     });
+ 
+-    statusResponse(await browser.runtime.sendMessage({
+-        action: 'get_status'
+-    }).catch((err) => {
+-        logError('Could not get status: ' + err);
+-    }));
++    statusResponse(await readPopupState('get_status') ?? {
++        error: tr('popupErrorEncountered'),
++        showGettingStartedGuideAlert: true
++    });
+ })();
+diff --git a/keepassxc-browser/popups/popup_functions.js b/keepassxc-browser/popups/popup_functions.js
+index f7f61a6..0130e98 100644
+--- a/keepassxc-browser/popups/popup_functions.js
++++ b/keepassxc-browser/popups/popup_functions.js
+@@ -27,10 +27,24 @@ async function initSettings() {
+     });
+ }
+ 
++// A cold MV3 worker can take a moment to register its message listener.
++// Only use this for reads during popup startup.
++async function readPopupState(action) {
++    for (let attempt = 0; attempt < 9; ++attempt) {
++        try {
++            return await browser.runtime.sendMessage({ action });
++        } catch (error) {
++            if (attempt === 8 || !error.message?.includes('Receiving end does not exist')) {
++                logError(error);
++                return undefined;
++            }
++            await new Promise(resolve => setTimeout(resolve, 400));
++        }
++    }
++}
++
+ async function initColorTheme() {
+-    let theme = await browser.runtime.sendMessage({
+-        action: 'get_color_theme'
+-    });
++    let theme = await readPopupState('get_color_theme') ?? 'system';
+     if (theme === 'system') {
+         theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+     }
+@@ -58,7 +72,5 @@ async function getLoginData(useBasicAuth = false) {
+         document.addEventListener('DOMContentLoaded', initSettings);
+     }
+ 
+-    updateAvailableResponse(await browser.runtime.sendMessage({
+-        action: 'update_available_keepassxc'
+-    }));
++    updateAvailableResponse(await readPopupState('update_available_keepassxc'));
+ })();
+diff --git a/keepassxc-browser/popups/popup_httpauth.html b/keepassxc-browser/popups/popup_httpauth.html
+index c494a0d..941d1ba 100644
+--- a/keepassxc-browser/popups/popup_httpauth.html
++++ b/keepassxc-browser/popups/popup_httpauth.html
+@@ -4,9 +4,10 @@
+     <title data-i18n="popupTitle"></title>
+     <meta charset="UTF-8">
+     <link rel="stylesheet" href="../css/colors.css">
+-    <link rel="stylesheet" href="popup.css">
+     <link rel="stylesheet" href="../bootstrap/bootstrap.min.css">
+     <link rel="stylesheet" href="../fonts/fork-awesome.min.css">
++    <link rel="stylesheet" href="../css/localvault.css">
++    <link rel="stylesheet" href="popup.css">
+     <script src="../common/browser-polyfill.min.js"></script>
+     <script src="../common/global.js"></script>
+     <script src="../common/global_ui.js"></script>
+@@ -15,9 +16,13 @@
+     <script defer src="popup_httpauth.js"></script>
+     <script defer src="../common/translate.js"></script>
+   </head>
+-  <body>
++  <body class="localvault popup-shell">
+     <div class="container">
+       <div id="settings" class="settings">
++        <h1 class="localvault-popup-brand">
++          <span class="localvault-popup-mark" aria-hidden="true"><i class="fa fa-lock"></i></span>
++          <span>LocalVault</span>
++        </h1>
+         <div class="function-buttons-area">
+           <button id="options-button" class="btn btn-sm btn-success" data-i18n="[title]popupSettingsText">
+             <i class="fa fa-cog" aria-hidden="true"></i>
+diff --git a/keepassxc-browser/popups/popup_login.html b/keepassxc-browser/popups/popup_login.html
+index 57dad2f..0fc9660 100644
+--- a/keepassxc-browser/popups/popup_login.html
++++ b/keepassxc-browser/popups/popup_login.html
+@@ -4,9 +4,10 @@
+     <title data-i18n="popupTitle"></title>
+     <meta charset="UTF-8">
+     <link rel="stylesheet" href="../css/colors.css">
+-    <link rel="stylesheet" href="popup.css">
+     <link rel="stylesheet" href="../bootstrap/bootstrap.min.css">
+     <link rel="stylesheet" href="../fonts/fork-awesome.min.css">
++    <link rel="stylesheet" href="../css/localvault.css">
++    <link rel="stylesheet" href="popup.css">
+     <script src="../common/browser-polyfill.min.js"></script>
+     <script src="../common/global.js"></script>
+     <script src="../common/global_ui.js"></script>
+@@ -15,9 +16,13 @@
+     <script defer src="popup_login.js"></script>
+     <script defer src="../common/translate.js"></script>
+   </head>
+-  <body>
++  <body class="localvault popup-shell">
+     <div class="container">
+       <div id="settings" class="settings">
++        <h1 class="localvault-popup-brand">
++          <span class="localvault-popup-mark" aria-hidden="true"><i class="fa fa-lock"></i></span>
++          <span>LocalVault</span>
++        </h1>
+         <div class="function-buttons-area">
+           <button id="options-button" class="btn btn-sm btn-success" data-i18n="[title]popupSettingsText">
+             <i class="fa fa-cog" aria-hidden="true"></i>
+diff --git a/keepassxc-browser/css/localvault.css b/keepassxc-browser/css/localvault.css
+new file mode 100644
+index 0000000..eb9be4a
+--- /dev/null
++++ b/keepassxc-browser/css/localvault.css
+@@ -0,0 +1,68 @@
++/* SPDX-License-Identifier: GPL-3.0-only */
++:root,
++[data-bs-theme="light"] {
++    --lv-canvas: #f2f6fc;
++    --lv-surface: #ffffff;
++    --lv-tint: #e6eefc;
++    --lv-line: #cbd8ec;
++    --lv-ink: #15243b;
++    --lv-muted: #475a75;
++    --lv-accent: #315cc0;
++    --lv-on-accent: #ffffff;
++}
++
++[data-bs-theme="dark"] {
++    --lv-canvas: #111827;
++    --lv-surface: #1a2436;
++    --lv-tint: #263752;
++    --lv-line: #435673;
++    --lv-ink: #edf2fa;
++    --lv-muted: #bdcbe1;
++    --lv-accent: #afc6ff;
++    --lv-on-accent: #122752;
++}
++
++@media (prefers-color-scheme: dark) {
++    :root:not([data-bs-theme="light"]) {
++        --lv-canvas: #111827;
++        --lv-surface: #1a2436;
++        --lv-tint: #263752;
++        --lv-line: #435673;
++        --lv-ink: #edf2fa;
++        --lv-muted: #bdcbe1;
++        --lv-accent: #afc6ff;
++        --lv-on-accent: #122752;
++    }
++}
++
++body.localvault {
++    --kpxc-background-color: var(--lv-canvas);
++    --kpxc-text-color: var(--lv-ink);
++    --kpxc-card-background-color: var(--lv-surface);
++    --kpxc-card-header-color: var(--lv-tint);
++    --kpxc-card-border-color: var(--lv-line);
++    --kpxc-input-background-color: var(--lv-surface);
++    --kpxc-input-main-border-color: var(--lv-line);
++    --kpxc-input-active-border-color: var(--lv-accent);
++    --kpxc-table-hover-color: var(--lv-tint);
++    --kpxc-link-color: var(--lv-accent);
++    --kpxc-link-hover-color: var(--lv-ink);
++    background: var(--lv-canvas);
++    color: var(--lv-ink);
++    font-family: system-ui, sans-serif;
++}
++
++.localvault .btn { border-radius: 999px; }
++.localvault .btn-primary,
++.localvault .btn-success {
++    --bs-btn-color: var(--lv-on-accent);
++    --bs-btn-bg: var(--lv-accent) !important;
++    --bs-btn-border-color: var(--lv-accent) !important;
++    --bs-btn-hover-bg: var(--lv-ink) !important;
++    --bs-btn-hover-border-color: var(--lv-ink) !important;
++    --bs-btn-hover-color: var(--lv-canvas);
++}
++.localvault :where(a, button, input, [tabindex]):focus-visible {
++    outline: 2px solid var(--lv-accent);
++    outline-offset: 2px;
++}

@@ -1,0 +1,12 @@
+.tools/
+build/
+dist/
+upstream/
+**/__pycache__/
+.gradle/
+**/local.properties
+**/*.kdbx
+**/*.keyx
+**/*.jks
+**/*.keystore
+!tests/fixtures/**

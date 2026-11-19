@@ -1,0 +1,877 @@
+diff --git a/app/build.gradle.kts b/app/build.gradle.kts
+index e4ab031..dd2d9fe 100644
+--- a/app/build.gradle.kts
++++ b/app/build.gradle.kts
+@@ -16,14 +16,14 @@ android {
+     val gmsPackage = "com.google.android.gms"
+ 
+     defaultConfig {
+-        applicationId = "com.kunzisoft.keepass"
++        applicationId = "dev.localvault.keepassdx"
+         minSdk = 19
+         targetSdk = 36
+         versionCode = 45800
+-        versionName = "4.5.8"
++        versionName = "4.5.8-localvault.1"
+         multiDexEnabled = true
+ 
+-        testApplicationId = "com.kunzisoft.keepass.tests"
++        testApplicationId = "dev.localvault.keepassdx.tests"
+         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+ 
+         buildConfigField("String", "GOOGLE_PLAY_SERVICES_PACKAGE", "\"$gmsPackage\"")
+@@ -39,6 +39,20 @@ android {
+         }
+     }
+ 
++    if (gradle.startParameter.taskNames.any { it.contains("release", ignoreCase = true) }) {
++        val signingValues = listOf("LOCALVAULT_KEYSTORE", "LOCALVAULT_KEY_ALIAS",
++            "LOCALVAULT_STORE_PASSWORD", "LOCALVAULT_KEY_PASSWORD").associateWith {
++            System.getenv(it) ?: throw GradleException("Missing release signing variable: $it")
++        }
++        signingConfigs.create("localVaultRelease") {
++            storeFile = file(signingValues.getValue("LOCALVAULT_KEYSTORE"))
++            keyAlias = signingValues.getValue("LOCALVAULT_KEY_ALIAS")
++            storePassword = signingValues.getValue("LOCALVAULT_STORE_PASSWORD")
++            keyPassword = signingValues.getValue("LOCALVAULT_KEY_PASSWORD")
++        }
++        buildTypes.getByName("release").signingConfig = signingConfigs.getByName("localVaultRelease")
++    }
++
+     buildFeatures {
+         buildConfig = true
+     }
+@@ -105,6 +119,11 @@ android {
+         unitTests.isIncludeAndroidResources = true
+     }
+ 
++    lint {
++        // Only the unchanged pre-Android-21 vector resource issues are baselined.
++        baseline = file("lint-baseline.xml")
++    }
++
+     compileOptions {
+         sourceCompatibility = JavaVersion.VERSION_17
+         targetCompatibility = JavaVersion.VERSION_17
+diff --git a/app/src/main/AndroidManifest.xml b/app/src/main/AndroidManifest.xml
+index 9ec2666..1862a70 100644
+--- a/app/src/main/AndroidManifest.xml
++++ b/app/src/main/AndroidManifest.xml
+@@ -192,6 +192,9 @@
+                 <action android:name="android.intent.action.MAIN"/>
+             </intent-filter>
+         </activity>
++        <activity
++            android:name="com.kunzisoft.keepass.settings.DeviceSetupActivity"
++            android:exported="false" />
+         <activity
+             android:name="com.kunzisoft.keepass.settings.AutofillSettingsActivity"
+             tools:targetApi="26" />
+diff --git a/app/src/main/java/com/kunzisoft/keepass/activities/GroupActivity.kt b/app/src/main/java/com/kunzisoft/keepass/activities/GroupActivity.kt
+index c62d92d..6c0cbaa 100644
+--- a/app/src/main/java/com/kunzisoft/keepass/activities/GroupActivity.kt
++++ b/app/src/main/java/com/kunzisoft/keepass/activities/GroupActivity.kt
+@@ -330,6 +330,13 @@ class GroupActivity : DatabaseLockActivity() {
+         lockView?.setOnClickListener {
+             lockAndExit()
+         }
++        findViewById<View>(R.id.vault_search_button).setOnClickListener {
++            mSearchViewModel.activateSearch()
++        }
++        findViewById<View>(R.id.vault_menu_button).apply {
++            visibility = if (mSpecialMode == SpecialMode.DEFAULT) View.VISIBLE else View.GONE
++            setOnClickListener { drawerLayout?.openDrawer(GravityCompat.START) }
++        }
+ 
+         toolbar?.title = ""
+         setSupportActionBar(toolbar)
+diff --git a/app/src/main/java/com/kunzisoft/keepass/activities/dialogs/UnderDevelopmentFeatureDialogFragment.kt b/app/src/main/java/com/kunzisoft/keepass/activities/dialogs/UnderDevelopmentFeatureDialogFragment.kt
+index 93d1c2c..7a6b2ec 100644
+--- a/app/src/main/java/com/kunzisoft/keepass/activities/dialogs/UnderDevelopmentFeatureDialogFragment.kt
++++ b/app/src/main/java/com/kunzisoft/keepass/activities/dialogs/UnderDevelopmentFeatureDialogFragment.kt
+@@ -48,12 +48,12 @@ class UnderDevelopmentFeatureDialogFragment : DialogFragment() {
+                 builder.setPositiveButton(android.R.string.ok) { _, _ -> dismiss() }
+             } else {
+              */
+-                stringBuilder.append(HtmlCompat.fromHtml(getString(R.string.html_text_dev_feature), HtmlCompat.FROM_HTML_MODE_LEGACY)).append("\n\n")
+-                        .append(HtmlCompat.fromHtml(getString(R.string.html_text_dev_feature_contibute), HtmlCompat.FROM_HTML_MODE_LEGACY)).append(" ")
+-                        .append(HtmlCompat.fromHtml(getString(R.string.html_text_dev_feature_encourage), HtmlCompat.FROM_HTML_MODE_LEGACY))
+-                builder.setPositiveButton(R.string.get_keepro) { _, _ ->
+-                    context?.openContributionLink()
+-                }
++            stringBuilder.append(HtmlCompat.fromHtml(getString(R.string.html_text_dev_feature), HtmlCompat.FROM_HTML_MODE_LEGACY)).append("\n\n")
++                    .append(HtmlCompat.fromHtml(getString(R.string.html_text_dev_feature_contibute), HtmlCompat.FROM_HTML_MODE_LEGACY)).append(" ")
++                    .append(HtmlCompat.fromHtml(getString(R.string.html_text_dev_feature_encourage), HtmlCompat.FROM_HTML_MODE_LEGACY))
++            builder.setPositiveButton(R.string.get_keepro) { _, _ ->
++                context?.openContributionLink()
++            }
+             //}
+             builder.setMessage(stringBuilder)
+             // Create the AlertDialog object and return it
+diff --git a/app/src/main/java/com/kunzisoft/keepass/credentialprovider/autofill/KeeAutofillService.kt b/app/src/main/java/com/kunzisoft/keepass/credentialprovider/autofill/KeeAutofillService.kt
+index 26482cc..6b68a48 100644
+--- a/app/src/main/java/com/kunzisoft/keepass/credentialprovider/autofill/KeeAutofillService.kt
++++ b/app/src/main/java/com/kunzisoft/keepass/credentialprovider/autofill/KeeAutofillService.kt
+@@ -112,6 +112,11 @@ class KeeAutofillService : AutofillService() {
+         cancellationSignal: CancellationSignal,
+         callback: FillCallback
+     ) {
++        getPreferences()
++        if (request.fillContexts.isEmpty()) {
++            callback.onSuccess(null)
++            return
++        }
+         cancellationSignal.setOnCancelListener { Log.w(TAG, "Cancel autofill.") }
+ 
+         if (request.flags and FillRequest.FLAG_COMPATIBILITY_MODE_REQUEST != 0) {
+@@ -407,6 +412,12 @@ class KeeAutofillService : AutofillService() {
+     }
+ 
+     override fun onSaveRequest(request: SaveRequest, callback: SaveCallback) {
++        // The service may stay connected while the user changes save preferences.
++        getPreferences()
++        if (request.fillContexts.isEmpty()) {
++            callback.onFailure("No form available to save")
++            return
++        }
+         var success = false
+         if (askToSaveData && Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+             val latestStructure = request.fillContexts.last().structure
+diff --git a/app/src/main/java/com/kunzisoft/keepass/services/DatabaseTaskNotificationService.kt b/app/src/main/java/com/kunzisoft/keepass/services/DatabaseTaskNotificationService.kt
+index 15aa6c8..7a2fbd7 100644
+--- a/app/src/main/java/com/kunzisoft/keepass/services/DatabaseTaskNotificationService.kt
++++ b/app/src/main/java/com/kunzisoft/keepass/services/DatabaseTaskNotificationService.kt
+@@ -401,6 +401,7 @@ open class DatabaseTaskNotificationService : LockNotificationService(), Progress
+                             TimeoutHelper.temporarilyDisableTimeout()
+ 
+                             sendBroadcast(Intent(DATABASE_START_TASK_ACTION).apply {
++                                setPackage(packageName)
+                                 putExtra(DATABASE_TASK_TITLE_KEY, mProgressMessage.titleId)
+                                 putExtra(DATABASE_TASK_MESSAGE_KEY, mProgressMessage.messageId)
+                                 putExtra(DATABASE_TASK_WARNING_KEY, mProgressMessage.warningId)
+@@ -480,7 +481,7 @@ open class DatabaseTaskNotificationService : LockNotificationService(), Progress
+                                 }
+                                 mTaskRemovedRequested = false
+                             }
+-                            sendBroadcast(Intent(DATABASE_STOP_TASK_ACTION))
++                            sendBroadcast(Intent(DATABASE_STOP_TASK_ACTION).setPackage(packageName))
+                         }
+                         mActionRunning--
+                         if (mActionRunning == 0) {
+diff --git a/app/src/main/java/com/kunzisoft/keepass/settings/MainPreferenceFragment.kt b/app/src/main/java/com/kunzisoft/keepass/settings/MainPreferenceFragment.kt
+index 3673a51..6779be7 100644
+--- a/app/src/main/java/com/kunzisoft/keepass/settings/MainPreferenceFragment.kt
++++ b/app/src/main/java/com/kunzisoft/keepass/settings/MainPreferenceFragment.kt
+@@ -20,6 +20,7 @@
+ package com.kunzisoft.keepass.settings
+ 
+ import android.content.Context
++import android.content.Intent
+ import android.os.Bundle
+ import androidx.fragment.app.activityViewModels
+ import androidx.lifecycle.Lifecycle
+@@ -78,6 +79,11 @@ class MainPreferenceFragment : PreferenceFragmentCompat() {
+     override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
+         setPreferencesFromResource(R.xml.preferences, rootKey)
+ 
++        findPreference<Preference>("localvault_device_setup")?.setOnPreferenceClickListener {
++            startActivity(Intent(requireContext(), DeviceSetupActivity::class.java))
++            true
++        }
++
+         // add listeners for non-default actions
+         findPreference<Preference>(getString(R.string.settings_app_key))?.apply {
+             onPreferenceClickListener = Preference.OnPreferenceClickListener {
+@@ -134,4 +140,4 @@ class MainPreferenceFragment : PreferenceFragmentCompat() {
+     interface Callback {
+         fun onNestedPreferenceSelected(key: NestedSettingsFragment.Screen, reload: Boolean = false)
+     }
+-}
+\ No newline at end of file
++}
+diff --git a/app/src/main/java/com/kunzisoft/keepass/view/ViewUtil.kt b/app/src/main/java/com/kunzisoft/keepass/view/ViewUtil.kt
+index 73adab4..6e255bc 100644
+--- a/app/src/main/java/com/kunzisoft/keepass/view/ViewUtil.kt
++++ b/app/src/main/java/com/kunzisoft/keepass/view/ViewUtil.kt
+@@ -45,7 +45,6 @@ import android.view.animation.AccelerateDecelerateInterpolator
+ import android.widget.ImageView
+ import android.widget.TextView
+ import android.widget.Toast
+-import androidx.appcompat.view.menu.ActionMenuItemView
+ import androidx.appcompat.widget.ActionMenuView
+ import androidx.appcompat.widget.Toolbar
+ import androidx.core.content.ContextCompat
+@@ -321,7 +320,7 @@ fun Toolbar.changeControlColor(color: Int) {
+                     // Change the color of any ActionMenuViews - icons that
+                     // are not back button, nor text, nor overflow menu icon.
+                     val innerView: View = view.getChildAt(j)
+-                    if (innerView is ActionMenuItemView) {
++                    if (innerView is TextView) {
+                         innerView.compoundDrawables.forEach { drawable ->
+                             //Important to set the color filter in separate thread,
+                             //by adding it to the message queue
+diff --git a/app/src/main/res/layout/activity_file_selection.xml b/app/src/main/res/layout/activity_file_selection.xml
+index c804268..a864046 100644
+--- a/app/src/main/res/layout/activity_file_selection.xml
++++ b/app/src/main/res/layout/activity_file_selection.xml
+@@ -43,8 +43,7 @@
+             android:id="@+id/activity_file_selection_coordinator_layout"
+             android:layout_width="match_parent"
+             android:layout_height="0dp"
+-            android:background="@drawable/background_repeat"
+-            android:backgroundTint="?android:attr/textColor"
++            android:background="?attr/colorSurface"
+             app:layout_constraintTop_toBottomOf="@+id/special_mode_view"
+             app:layout_constraintBottom_toTopOf="@+id/file_selection_buttons_container">
+ 
+@@ -64,57 +63,36 @@
+                         android:layout_width="match_parent"
+                         android:layout_height="wrap_content"
+                         app:layout_collapseMode="parallax"
+-                        android:layoutDirection="ltr"
+                         android:layout_gravity="center_horizontal|bottom"
+-                        android:gravity="center"
+-                        android:orientation="horizontal"
+-                        android:paddingBottom="36dp">
++                        android:gravity="start"
++                        android:orientation="vertical"
++                        android:paddingHorizontal="24dp"
++                        android:paddingTop="?attr/actionBarSize"
++                        android:paddingBottom="28dp">
+                         <TextView
+                             android:id="@+id/file_selection_title_part_1"
+                             android:layout_width="wrap_content"
+                             android:layout_height="wrap_content"
+-                            android:textSize="32sp"
++                            android:textSize="38sp"
+                             android:textStyle="bold"
+-                            android:shadowColor="#AD000000"
+-                            android:shadowDx="0"
+-                            android:shadowDy="2"
+-                            android:shadowRadius="2"
+-                            android:paddingTop="?attr/actionBarSize"
+-                            android:textColor="?attr/colorPrimaryContainer"
+-                            android:gravity="center"
+-                            android:text="@string/app_name_part1"/>
++                            android:textColor="?attr/colorOnSurface"
++                            android:text="@string/localvault_brand"/>
+                         <TextView
+                             android:id="@+id/file_selection_title_part_2"
+                             android:layout_width="wrap_content"
+                             android:layout_height="wrap_content"
+-                            android:layout_marginStart="2dp"
+-                            android:layout_marginLeft="2dp"
+-                            android:textSize="32sp"
+-                            android:textStyle="bold"
+-                            android:shadowColor="#AD000000"
+-                            android:shadowDx="0"
+-                            android:shadowDy="2"
+-                            android:shadowRadius="2"
+-                            android:paddingTop="?attr/actionBarSize"
+-                            android:textColor="?attr/colorSecondary"
+-                            android:gravity="center"
+-                            android:text="@string/app_name_part2"/>
++                            android:layout_marginTop="8dp"
++                            android:textSize="16sp"
++                            android:textColor="?attr/colorOnSurfaceVariant"
++                            android:text="@string/localvault_vault_picker"/>
+                         <TextView
+                             android:id="@+id/file_selection_title_part_3"
+                             android:layout_width="wrap_content"
+                             android:layout_height="wrap_content"
+-                            android:layout_marginStart="8dp"
+-                            android:layout_marginLeft="8dp"
+-                            android:paddingHorizontal="4dp"
+-                            android:textSize="32sp"
+-                            android:textStyle="bold"
++                            android:layout_marginTop="8dp"
++                            android:textSize="14sp"
+                             android:visibility="gone"
+-                            android:shadowColor="#AD000000"
+-                            android:shadowDx="0"
+-                            android:shadowDy="2"
+-                            android:shadowRadius="2"
+-                            android:paddingTop="?attr/actionBarSize"
+-                            android:textColor="?attr/colorSecondaryContainer"
++                            android:textColor="?attr/colorOnSurfaceVariant"
+                             android:gravity="center"
+                             android:text="@string/app_name_part3"/>
+                     </LinearLayout>
+@@ -141,10 +119,16 @@
+ 
+         <androidx.constraintlayout.widget.ConstraintLayout
+             android:id="@+id/file_selection_buttons_container"
+-            android:layout_width="match_parent"
++            android:layout_width="0dp"
+             android:layout_height="wrap_content"
++            android:layout_marginHorizontal="16dp"
++            android:layout_marginBottom="10dp"
++            android:padding="6dp"
+             app:layout_constraintBottom_toTopOf="@+id/screenshot_mode_banner"
+-            android:background="?attr/colorSurface">
++            app:layout_constraintStart_toStartOf="parent"
++            app:layout_constraintEnd_toEndOf="parent"
++            app:layout_constraintWidth_max="480dp"
++            android:background="@drawable/localvault_glass">
+ 
+             <androidx.constraintlayout.widget.Guideline
+                 android:id="@+id/guideline_buttons"
+@@ -157,6 +141,7 @@
+                 android:id="@+id/create_database_button"
+                 android:layout_width="0dp"
+                 android:layout_height="wrap_content"
++                android:layout_marginEnd="4dp"
+                 app:icon="@drawable/ic_database_plus_white_24dp"
+                 app:iconGravity="start"
+                 app:layout_constraintStart_toStartOf="parent"
+@@ -171,6 +156,7 @@
+                 android:id="@+id/open_database_button"
+                 android:layout_width="0dp"
+                 android:layout_height="wrap_content"
++                android:layout_marginStart="4dp"
+                 android:text="@string/select_database_file"
+                 app:icon="@drawable/ic_folder_white_24dp"
+                 app:iconGravity="start"
+@@ -185,4 +171,4 @@
+ 
+         <include layout="@layout/view_screenshot_mode_banner" />
+     </androidx.constraintlayout.widget.ConstraintLayout>
+-</FrameLayout>
+\ No newline at end of file
++</FrameLayout>
+diff --git a/app/src/main/res/layout/activity_group.xml b/app/src/main/res/layout/activity_group.xml
+index a6cd927..a7eacd7 100644
+--- a/app/src/main/res/layout/activity_group.xml
++++ b/app/src/main/res/layout/activity_group.xml
+@@ -92,7 +92,7 @@
+             android:id="@+id/group_coordinator"
+             android:layout_width="match_parent"
+             android:layout_height="0dp"
+-            app:layout_constraintBottom_toTopOf="@+id/screenshot_mode_banner"
++            app:layout_constraintBottom_toTopOf="@+id/activity_group_footer"
+             app:layout_constraintTop_toBottomOf="@+id/activity_group_header">
+ 
+             <com.google.android.material.appbar.AppBarLayout
+@@ -135,7 +135,7 @@
+             android:id="@+id/search_content_view"
+             android:layout_width="match_parent"
+             android:layout_height="0dp"
+-            app:layout_constraintBottom_toTopOf="@+id/screenshot_mode_banner"
++            app:layout_constraintBottom_toTopOf="@+id/activity_group_footer"
+             app:layout_constraintTop_toBottomOf="@+id/special_mode_view" />
+ 
+         <androidx.constraintlayout.widget.ConstraintLayout
+@@ -148,15 +148,44 @@
+                 android:id="@+id/toolbar_action"
+                 android:layout_width="match_parent"
+                 android:layout_height="64dp"
+-                app:layout_constraintBottom_toBottomOf="parent"
++                app:layout_constraintBottom_toTopOf="@+id/vault_actions"
+                 android:visibility="gone" />
+ 
+-            <include
+-                layout="@layout/view_button_lock"
+-                android:layout_width="wrap_content"
++            <LinearLayout
++                android:id="@+id/vault_actions"
++                android:layout_width="0dp"
+                 android:layout_height="wrap_content"
++                android:layout_marginHorizontal="16dp"
++                android:layout_marginTop="4dp"
++                android:layout_marginBottom="10dp"
++                android:background="@drawable/localvault_glass"
++                android:elevation="6dp"
++                android:orientation="horizontal"
++                android:padding="5dp"
++                android:filterTouchesWhenObscured="true"
+                 app:layout_constraintBottom_toBottomOf="parent"
+-                app:layout_constraintStart_toStartOf="parent" />
++                app:layout_constraintStart_toStartOf="parent"
++                app:layout_constraintEnd_toEndOf="parent"
++                app:layout_constraintWidth_max="480dp">
++
++                <com.google.android.material.button.MaterialButton
++                    android:id="@+id/vault_search_button"
++                    style="@style/LocalVault.Action"
++                    android:text="@string/search"
++                    app:icon="@drawable/ic_search_white_24dp" />
++
++                <com.google.android.material.button.MaterialButton
++                    android:id="@+id/vault_menu_button"
++                    style="@style/LocalVault.Action"
++                    android:text="@string/localvault_more"
++                    app:icon="@drawable/ic_folder_white_24dp" />
++
++                <com.google.android.material.button.MaterialButton
++                    android:id="@+id/lock_button"
++                    style="@style/LocalVault.Action"
++                    android:text="@string/lock"
++                    app:icon="@drawable/ic_lock_white_24dp" />
++            </LinearLayout>
+ 
+         </androidx.constraintlayout.widget.ConstraintLayout>
+ 
+diff --git a/app/src/main/res/layout/activity_main_credential.xml b/app/src/main/res/layout/activity_main_credential.xml
+index cf7102a..bac8e9e 100644
+--- a/app/src/main/res/layout/activity_main_credential.xml
++++ b/app/src/main/res/layout/activity_main_credential.xml
+@@ -42,8 +42,7 @@
+             android:id="@+id/activity_password_coordinator_layout"
+             android:layout_width="match_parent"
+             android:layout_height="0dp"
+-            android:background="@drawable/background_repeat"
+-            android:backgroundTint="?android:attr/textColor"
++            android:background="?attr/colorSurface"
+             app:layout_constraintTop_toBottomOf="@+id/special_mode_view"
+             app:layout_constraintBottom_toTopOf="@+id/activity_password_footer">
+ 
+@@ -210,4 +209,4 @@
+ 
+         <include layout="@layout/view_screenshot_mode_banner" />
+     </androidx.constraintlayout.widget.ConstraintLayout>
+-</FrameLayout>
+\ No newline at end of file
++</FrameLayout>
+diff --git a/app/src/main/res/values-sv/strings.xml b/app/src/main/res/values-sv/strings.xml
+index f3825d9..4395df6 100644
+--- a/app/src/main/res/values-sv/strings.xml
++++ b/app/src/main/res/values-sv/strings.xml
+@@ -68,7 +68,7 @@
+     <string name="error_out_of_memory">Otillräckligt minne för att ladda hela databasen.</string>
+     <string name="error_pass_gen_type">Minst en typ av lösenordsgenerering måste väljas.</string>
+     <string name="error_pass_match">Lösenorden matchar inte.</string>
+-    <string name="error_rounds_too_large">Värdet för \"Transformationsrundor\" är för högt. Det sätts till 2147483648.</string>
++    <string name="error_rounds_too_large">Värdet för \"Transformationsrundor\" är för högt. Det sätts till %1$s.</string>
+     <string name="error_string_key">Varje sträng måste ha ett fältnamn.</string>
+     <string name="error_wrong_length">Ange ett positivt heltal i fältet \"Längd\".</string>
+     <string name="field_name">Fältnamn</string>
+diff --git a/app/src/main/res/values/donottranslate.xml b/app/src/main/res/values/donottranslate.xml
+index 1a4d416..56b224a 100644
+--- a/app/src/main/res/values/donottranslate.xml
++++ b/app/src/main/res/values/donottranslate.xml
+@@ -180,7 +180,7 @@
+     <string name="autofill_suggestions_key" translatable="false">autofill_suggestions_key</string>
+     <bool name="autofill_suggestions_default" translatable="false">true</bool>
+     <string name="autofill_inline_suggestions_key" translatable="false">autofill_inline_suggestions_key</string>
+-    <bool name="autofill_inline_suggestions_default" translatable="false">false</bool>
++    <bool name="autofill_inline_suggestions_default" translatable="false">true</bool>
+     <string name="autofill_manual_selection_key" translatable="false">autofill_manual_selection_key</string>
+     <bool name="autofill_manual_selection_default" translatable="false">true</bool>
+     <string name="autofill_share_magikeyboard_key" translatable="false">autofill_share_magikeyboard_key</string>
+@@ -188,7 +188,7 @@
+     <string name="autofill_save_search_info_key" translatable="false">autofill_save_search_info_key</string>
+     <bool name="autofill_save_search_info_default" translatable="false">true</bool>
+     <string name="autofill_ask_to_save_data_key" translatable="false">autofill_ask_to_save_data_key</string>
+-    <bool name="autofill_ask_to_save_data_default" translatable="false">false</bool>
++    <bool name="autofill_ask_to_save_data_default" translatable="false">true</bool>
+     <string name="autofill_application_id_blocklist_key" translatable="false">autofill_application_id_blocklist_key</string>
+     <string-array name="autofill_application_id_blocklist_default">
+     </string-array>
+diff --git a/app/src/main/res/xml/preferences.xml b/app/src/main/res/xml/preferences.xml
+index bd3fc1a..67c7ec8 100644
+--- a/app/src/main/res/xml/preferences.xml
++++ b/app/src/main/res/xml/preferences.xml
+@@ -22,6 +22,12 @@
+ 	<PreferenceCategory
+ 		android:title="@string/application">
+ 		<Preference
++            android:key="localvault_device_setup"
++            android:title="@string/localvault_setup_title"
++            android:summary="@string/localvault_setup_summary"
++            android:icon="@drawable/prefs_phone_android_24dp"
++            android:persistent="false" />
++		<Preference
+             android:key="@string/settings_app_key"
+             android:title="@string/menu_app_settings"
+ 			android:icon="@drawable/prefs_phone_android_24dp"
+diff --git a/crypto/src/main/jni/aes/CMakeLists.txt b/crypto/src/main/jni/aes/CMakeLists.txt
+index a043ca8..f37cd65 100644
+--- a/crypto/src/main/jni/aes/CMakeLists.txt
++++ b/crypto/src/main/jni/aes/CMakeLists.txt
+@@ -20,4 +20,4 @@ add_library(
+ find_library(log-lib log)
+ 
+ target_link_libraries(aes ${log-lib})
+-target_link_options(aes PRIVATE "-Wl,-z,max-page-size=16384")
++target_link_options(aes PRIVATE "-Wl,-z,max-page-size=16384" "-Wl,-z,common-page-size=16384")
+diff --git a/crypto/src/main/jni/argon2/CMakeLists.txt b/crypto/src/main/jni/argon2/CMakeLists.txt
+index 64b4eb3..5a05f22 100644
+--- a/crypto/src/main/jni/argon2/CMakeLists.txt
++++ b/crypto/src/main/jni/argon2/CMakeLists.txt
+@@ -16,4 +16,4 @@ add_library(
+     argon2_jni.c
+ )
+ 
+-target_link_options(argon2 PRIVATE "-Wl,-z,max-page-size=16384")
++target_link_options(argon2 PRIVATE "-Wl,-z,max-page-size=16384" "-Wl,-z,common-page-size=16384")
+diff --git a/app/lint-baseline.xml b/app/lint-baseline.xml
+new file mode 100644
+index 0000000..aaa4dc8
+--- /dev/null
++++ b/app/lint-baseline.xml
+@@ -0,0 +1,25 @@
++<?xml version="1.0" encoding="UTF-8"?>
++<!-- Upstream 4.5.8 resource compatibility below API 21. First-version target is API 30+. -->
++<issues format="6" by="lint 8.13.2">
++    <issue id="VectorDrawableCompat" message="To use VectorDrawableCompat, you need to set `android.defaultConfig.vectorDrawables.useSupportLibrary = true` in `:app\build.gradle`">
++        <location file="src/main/res/layout/fragment_search.xml" line="44" />
++    </issue>
++    <issue id="VectorDrawableCompat" message="To use VectorDrawableCompat, you need to set `android.defaultConfig.vectorDrawables.useSupportLibrary = true` in `:app\build.gradle`">
++        <location file="src/main/res/layout/fragment_search.xml" line="90" />
++    </issue>
++    <issue id="VectorDrawableCompat" message="To use VectorDrawableCompat, you need to set `android.defaultConfig.vectorDrawables.useSupportLibrary = true` in `:app\build.gradle`">
++        <location file="src/main/res/layout/keyboard_container.xml" line="46" />
++    </issue>
++    <issue id="VectorDrawableCompat" message="To use VectorDrawableCompat, you need to set `android.defaultConfig.vectorDrawables.useSupportLibrary = true` in `:app\build.gradle`">
++        <location file="src/main/res/layout/keyboard_container.xml" line="56" />
++    </issue>
++    <issue id="VectorDrawableCompat" message="To use VectorDrawableCompat, you need to set `android.defaultConfig.vectorDrawables.useSupportLibrary = true` in `:app\build.gradle`">
++        <location file="src/main/res/layout/keyboard_container.xml" line="86" />
++    </issue>
++    <issue id="VectorDrawableCompat" message="To use VectorDrawableCompat, you need to set `android.defaultConfig.vectorDrawables.useSupportLibrary = true` in `:app\build.gradle`">
++        <location file="src/main/res/layout/nav_header_database.xml" line="41" />
++    </issue>
++    <issue id="VectorDrawableCompat" message="To use VectorDrawableCompat, you need to set `android.defaultConfig.vectorDrawables.useSupportLibrary = true` in `:app\build.gradle`">
++        <location file="src/main/res/layout/view_search_filters.xml" line="50" />
++    </issue>
++</issues>
+diff --git a/app/src/main/java/com/kunzisoft/keepass/settings/DeviceSetupActivity.kt b/app/src/main/java/com/kunzisoft/keepass/settings/DeviceSetupActivity.kt
+new file mode 100644
+index 0000000..aa25c1c
+--- /dev/null
++++ b/app/src/main/java/com/kunzisoft/keepass/settings/DeviceSetupActivity.kt
+@@ -0,0 +1,110 @@
++// SPDX-License-Identifier: GPL-3.0-or-later
++package com.kunzisoft.keepass.settings
++
++import android.content.ActivityNotFoundException
++import android.content.Intent
++import android.net.Uri
++import android.os.Build
++import android.os.Bundle
++import android.provider.Settings
++import android.view.WindowManager
++import android.view.autofill.AutofillManager
++import android.widget.Button
++import android.widget.LinearLayout
++import android.widget.ScrollView
++import android.widget.TextView
++import android.widget.Toast
++import androidx.appcompat.app.AppCompatActivity
++import androidx.core.view.ViewCompat
++import androidx.core.view.WindowInsetsCompat
++import com.kunzisoft.keepass.R
++
++/** No vault access. Returning from system settings refreshes the calling package's status. */
++class DeviceSetupActivity : AppCompatActivity() {
++    private lateinit var status: TextView
++
++    override fun onCreate(savedInstanceState: Bundle?) {
++        super.onCreate(savedInstanceState)
++        window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
++        title = getString(R.string.localvault_setup_title)
++        val content = LinearLayout(this).apply {
++            orientation = LinearLayout.VERTICAL
++            val padding = (20 * resources.displayMetrics.density).toInt()
++            setPadding(padding, padding, padding, padding)
++        }
++        val padding = (20 * resources.displayMetrics.density).toInt()
++        ViewCompat.setOnApplyWindowInsetsListener(content) { view, insets ->
++            val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
++            view.setPadding(padding + bars.left, padding + bars.top,
++                padding + bars.right, padding + bars.bottom)
++            insets
++        }
++        fun text(value: String): TextView = TextView(this).apply {
++            text = value
++            textSize = 16f
++            setPadding(0, 12, 0, 12)
++            content.addView(this)
++        }
++        fun button(label: Int, action: () -> Unit) {
++            content.addView(Button(this).apply {
++                setText(label)
++                setOnClickListener { action() }
++            })
++        }
++        text(getString(R.string.localvault_setup_title)).textSize = 22f
++        text(getString(R.string.localvault_device_info,
++            "${Build.MANUFACTURER} ${Build.MODEL}", Build.VERSION.RELEASE,
++            Build.VERSION.SDK_INT, Build.DISPLAY))
++        status = text("")
++        val profile = DeviceSetupProfile.forManufacturer(Build.MANUFACTURER, Build.BRAND)
++        text(getString(when (profile) {
++            DeviceSetupProfile.XIAOMI -> R.string.localvault_hint_xiaomi
++            DeviceSetupProfile.SAMSUNG -> R.string.localvault_hint_samsung
++            DeviceSetupProfile.COLOROS -> R.string.localvault_hint_coloros
++            DeviceSetupProfile.VIVO -> R.string.localvault_hint_vivo
++            DeviceSetupProfile.GENERIC -> R.string.localvault_hint_generic
++        }))
++        button(R.string.localvault_choose_service) {
++            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
++                openSettings(Intent(Settings.ACTION_REQUEST_SET_AUTOFILL_SERVICE,
++                    Uri.parse("package:$packageName")))
++            } else {
++                Toast.makeText(this, R.string.localvault_autofill_unsupported, Toast.LENGTH_LONG).show()
++            }
++        }
++        button(R.string.localvault_fill_options) {
++            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
++                startActivity(Intent(this, AutofillSettingsActivity::class.java))
++            }
++        }
++        button(R.string.localvault_app_settings) {
++            openSettings(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
++                Uri.parse("package:$packageName")))
++        }
++        text(getString(R.string.localvault_hint_browser))
++        text(getString(R.string.localvault_hint_limits))
++        button(R.string.localvault_back) { finish() }
++        setContentView(ScrollView(this).apply { addView(content) })
++    }
++
++    override fun onResume() {
++        super.onResume()
++        if (!::status.isInitialized) return
++        val enabled = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
++            getSystemService(AutofillManager::class.java)?.hasEnabledAutofillServices() == true
++        status.setText(if (enabled) R.string.localvault_service_enabled else R.string.localvault_service_disabled)
++    }
++
++    private fun openSettings(intent: Intent) {
++        try {
++            startActivity(intent)
++        } catch (_: ActivityNotFoundException) {
++            try { startActivity(Intent(Settings.ACTION_SETTINGS)) }
++            catch (_: ActivityNotFoundException) {
++                Toast.makeText(this, R.string.localvault_settings_unavailable, Toast.LENGTH_LONG).show()
++            }
++        } catch (_: SecurityException) {
++            Toast.makeText(this, R.string.localvault_settings_unavailable, Toast.LENGTH_LONG).show()
++        }
++    }
++}
+diff --git a/app/src/main/java/com/kunzisoft/keepass/settings/DeviceSetupProfile.kt b/app/src/main/java/com/kunzisoft/keepass/settings/DeviceSetupProfile.kt
+new file mode 100644
+index 0000000..2a79322
+--- /dev/null
++++ b/app/src/main/java/com/kunzisoft/keepass/settings/DeviceSetupProfile.kt
+@@ -0,0 +1,22 @@
++// SPDX-License-Identifier: GPL-3.0-or-later
++package com.kunzisoft.keepass.settings
++
++import java.util.Locale
++
++/** Device hints only; never changes credential matching or requests OEM permissions. */
++enum class DeviceSetupProfile {
++    XIAOMI, SAMSUNG, COLOROS, VIVO, GENERIC;
++
++    companion object {
++        fun forManufacturer(manufacturer: String, brand: String): DeviceSetupProfile {
++            val names = setOf(manufacturer, brand).map { it.trim().lowercase(Locale.ROOT) }
++            return when {
++                names.any { it in setOf("xiaomi", "redmi", "poco") } -> XIAOMI
++                "samsung" in names -> SAMSUNG
++                names.any { it in setOf("oppo", "oneplus", "realme") } -> COLOROS
++                names.any { it in setOf("vivo", "iqoo") } -> VIVO
++                else -> GENERIC
++            }
++        }
++    }
++}
+diff --git a/app/src/main/res/drawable/localvault_glass.xml b/app/src/main/res/drawable/localvault_glass.xml
+new file mode 100644
+index 0000000..f8ca069
+--- /dev/null
++++ b/app/src/main/res/drawable/localvault_glass.xml
+@@ -0,0 +1,9 @@
++<?xml version="1.0" encoding="utf-8"?>
++<shape xmlns:android="http://schemas.android.com/apk/res/android">
++    <corners android:radius="26dp" />
++    <gradient
++        android:angle="270"
++        android:startColor="@color/localvault_glass_light"
++        android:endColor="@color/localvault_glass_shade" />
++    <stroke android:width="1dp" android:color="@color/localvault_glass_edge" />
++</shape>
+diff --git a/app/src/main/res/values-night/localvault_appearance.xml b/app/src/main/res/values-night/localvault_appearance.xml
+new file mode 100644
+index 0000000..1887db1
+--- /dev/null
++++ b/app/src/main/res/values-night/localvault_appearance.xml
+@@ -0,0 +1,7 @@
++<?xml version="1.0" encoding="utf-8"?>
++<resources>
++    <color name="localvault_glass_light">#F038475D</color>
++    <color name="localvault_glass_shade">#F01A2436</color>
++    <color name="localvault_glass_edge">#C37F96B5</color>
++    <color name="localvault_action_text">#E3EEFF</color>
++</resources>
+diff --git a/app/src/main/res/values-zh-rCN/localvault.xml b/app/src/main/res/values-zh-rCN/localvault.xml
+new file mode 100644
+index 0000000..2a05e7b
+--- /dev/null
++++ b/app/src/main/res/values-zh-rCN/localvault.xml
+@@ -0,0 +1,21 @@
++<?xml version="1.0" encoding="utf-8"?>
++<resources>
++    <string name="localvault_setup_title">设备适配与快捷填充</string>
++    <string name="localvault_setup_summary">优先适配红米 K80 Pro / 澎湃系统，兼顾其他安卓设备</string>
++    <string name="localvault_device_info">设备：%1$s\nAndroid：%2$s（API %3$d）\n系统构建号：%4$s</string>
++    <string name="localvault_service_enabled">本应用的自动填充服务已启用。</string>
++    <string name="localvault_service_disabled">尚未启用本应用的自动填充服务。</string>
++    <string name="localvault_choose_service">选择默认自动填充服务</string>
++    <string name="localvault_fill_options">设置键盘建议与保存提示</string>
++    <string name="localvault_app_settings">打开本应用的系统设置</string>
++    <string name="localvault_back">返回</string>
++    <string name="localvault_autofill_unsupported">系统自动填充需要 Android 8 及以上；可使用手动选择或 Magikeyboard。</string>
++    <string name="localvault_settings_unavailable">无法打开设置，请在系统设置中搜索“自动填充”。</string>
++    <string name="localvault_hint_xiaomi">红米 K80 Pro / 小米 / 澎湃系统：将本应用设为首选密码与自动填充服务。若点击候选后无法打开密码库，检查系统是否阻止本应用在后台弹出界面；仅在影响使用时检查本应用的电池限制。无需关闭 MIUI 优化或系统安全防护。实机测试时，请从“关于手机”记录完整 HyperOS 版本。</string>
++    <string name="localvault_hint_samsung">三星 One UI：在系统设置中搜索“密码”“首选服务”或“自动填充”，选择本应用。菜单名称随版本变化。</string>
++    <string name="localvault_hint_coloros">OPPO / 一加 / realme：在系统设置中搜索“密码”或“自动填充服务”，选择本应用。只有候选无法打开时才检查本应用的后台限制。</string>
++    <string name="localvault_hint_vivo">vivo / iQOO：在系统设置中搜索“密码”或“自动填充”，选择本应用。只有候选无法打开时才检查本应用的后台限制。</string>
++    <string name="localvault_hint_generic">安卓通用：在系统设置中搜索“自动填充服务”或“密码、通行密钥和账号”，选择本应用。首次使用前先创建或打开密码库。</string>
++    <string name="localvault_hint_browser">Chrome 及其衍生浏览器可能还需选择“设置 → 自动填充服务 → 使用其他服务”。键盘内建议需要键盘支持。填充前请确认目标网站或应用。</string>
++    <string name="localvault_hint_limits">只有目标表单支持系统自动填充时，系统才能提供保存提示。无法识别时使用手动新增、手动选择或 Magikeyboard。新增和更新均通过原有界面确认。设置指引不代表已通过对应设备实测。密码保存在本地加密 KDBX 文件中。</string>
++</resources>
+diff --git a/app/src/main/res/values-zh-rCN/localvault_appearance.xml b/app/src/main/res/values-zh-rCN/localvault_appearance.xml
+new file mode 100644
+index 0000000..e6a6807
+--- /dev/null
++++ b/app/src/main/res/values-zh-rCN/localvault_appearance.xml
+@@ -0,0 +1,5 @@
++<?xml version="1.0" encoding="utf-8"?>
++<resources>
++    <string name="localvault_more">库菜单</string>
++    <string name="localvault_vault_picker">打开或创建你的密码库</string>
++</resources>
+diff --git a/app/src/main/res/values/localvault.xml b/app/src/main/res/values/localvault.xml
+new file mode 100644
+index 0000000..4a02b99
+--- /dev/null
++++ b/app/src/main/res/values/localvault.xml
+@@ -0,0 +1,22 @@
++<?xml version="1.0" encoding="utf-8"?>
++<!-- This customization ships English fallback and Simplified Chinese translations. -->
++<resources xmlns:tools="http://schemas.android.com/tools" tools:ignore="MissingTranslation">
++    <string name="localvault_setup_title">Device setup · LocalVault</string>
++    <string name="localvault_setup_summary">Redmi K80 Pro / HyperOS and other Android devices</string>
++    <string name="localvault_device_info">Device: %1$s\nAndroid: %2$s (API %3$d)\nBuild: %4$s</string>
++    <string name="localvault_service_enabled">This app is enabled as an Autofill service.</string>
++    <string name="localvault_service_disabled">This app is not enabled as an Autofill service.</string>
++    <string name="localvault_choose_service">Choose default Autofill service</string>
++    <string name="localvault_fill_options">Suggestions and save prompts</string>
++    <string name="localvault_app_settings">Open this app’s system settings</string>
++    <string name="localvault_back">Back</string>
++    <string name="localvault_autofill_unsupported">System Autofill requires Android 8 or later. Use manual selection or Magikeyboard.</string>
++    <string name="localvault_settings_unavailable">Unable to open system settings. Search for Autofill in your device settings.</string>
++    <string name="localvault_hint_xiaomi">Redmi K80 Pro / Xiaomi / HyperOS: choose this app as the preferred password and Autofill service. If selecting a suggestion cannot open the vault, check whether system settings block background pop-up windows for this app. Adjust battery restrictions only if they affect use. Do not disable MIUI optimization or system security. HyperOS version must be recorded from About phone during device testing.</string>
++    <string name="localvault_hint_samsung">Samsung One UI: search device settings for Passwords, preferred service or Autofill, then select this app. Menu names vary by version.</string>
++    <string name="localvault_hint_coloros">OPPO / OnePlus / realme: search device settings for Passwords or Autofill service and select this app. Review app-specific background restrictions only if opening suggestions fails.</string>
++    <string name="localvault_hint_vivo">vivo / iQOO: search device settings for Passwords or Autofill and select this app. Review app-specific background restrictions only if opening suggestions fails.</string>
++    <string name="localvault_hint_generic">Android: search settings for Autofill service or Passwords, passkeys and accounts, then select this app. Create or open a vault before the first use.</string>
++    <string name="localvault_hint_browser">Chrome-based browsers may require Settings → Autofill services → Autofill using another service. Inline suggestions also require a compatible keyboard. Confirm the website or app before filling.</string>
++    <string name="localvault_hint_limits">Save prompts require the target form to support system Autofill. Otherwise create an entry manually or use Magikeyboard. Existing save and update screens require confirmation. Device-specific instructions do not imply successful real-device testing. Vaults remain local encrypted KDBX files.</string>
++</resources>
+diff --git a/app/src/main/res/values/localvault_appearance.xml b/app/src/main/res/values/localvault_appearance.xml
+new file mode 100644
+index 0000000..e92e54e
+--- /dev/null
++++ b/app/src/main/res/values/localvault_appearance.xml
+@@ -0,0 +1,23 @@
++<?xml version="1.0" encoding="utf-8"?>
++<resources xmlns:tools="http://schemas.android.com/tools">
++    <color name="localvault_glass_light">#F8FFFFFF</color>
++    <color name="localvault_glass_shade">#F0E1EBF6</color>
++    <color name="localvault_glass_edge">#AD9BB0CD</color>
++    <string name="localvault_more" tools:ignore="MissingTranslation">Vault menu</string>
++    <string name="localvault_brand" translatable="false">LocalVault</string>
++    <string name="localvault_vault_picker" tools:ignore="MissingTranslation">Choose or create a password vault</string>
++    <style name="LocalVault.Action" parent="Widget.Material3.Button.TextButton">
++        <item name="android:layout_width">0dp</item>
++        <item name="android:layout_height">wrap_content</item>
++        <item name="android:layout_weight">1</item>
++        <item name="android:minHeight">55dp</item>
++        <item name="android:paddingStart">2dp</item>
++        <item name="android:paddingEnd">2dp</item>
++        <item name="android:textColor">@color/localvault_action_text</item>
++        <item name="iconTint">@color/localvault_action_text</item>
++        <item name="iconSize">20dp</item>
++        <item name="iconPadding">3dp</item>
++        <item name="iconGravity">textTop</item>
++    </style>
++    <color name="localvault_action_text">#183353</color>
++</resources>
+diff --git a/app/src/test/java/com/kunzisoft/keepass/settings/DeviceSetupActivityTest.kt b/app/src/test/java/com/kunzisoft/keepass/settings/DeviceSetupActivityTest.kt
+new file mode 100644
+index 0000000..0e71cc1
+--- /dev/null
++++ b/app/src/test/java/com/kunzisoft/keepass/settings/DeviceSetupActivityTest.kt
+@@ -0,0 +1,39 @@
++// SPDX-License-Identifier: GPL-3.0-or-later
++package com.kunzisoft.keepass.settings
++
++import android.provider.Settings
++import android.view.View
++import android.view.ViewGroup
++import android.view.WindowManager
++import android.widget.Button
++import com.kunzisoft.keepass.R
++import org.junit.Assert.assertEquals
++import org.junit.Assert.assertTrue
++import org.junit.Test
++import org.junit.runner.RunWith
++import org.robolectric.Robolectric
++import org.robolectric.RobolectricTestRunner
++import org.robolectric.Shadows.shadowOf
++import org.robolectric.annotation.Config
++
++@RunWith(RobolectricTestRunner::class)
++@Config(sdk = [30, 34])
++class DeviceSetupActivityTest {
++    @Test fun serviceSelectionTargetsThisPackageAndActivityResumes() {
++        val controller = Robolectric.buildActivity(DeviceSetupActivity::class.java).setup()
++        val activity = controller.get()
++        assertTrue(activity.window.attributes.flags and WindowManager.LayoutParams.FLAG_SECURE != 0)
++        fun children(view: View): List<View> = listOf(view) +
++            if (view is ViewGroup) (0 until view.childCount).flatMap { children(view.getChildAt(it)) }
++            else emptyList()
++        val buttons = children(activity.window.decorView).filterIsInstance<Button>()
++        val choose = buttons.single { it.text == activity.getString(R.string.localvault_choose_service) }
++        choose.performClick()
++        val intent = shadowOf(activity).nextStartedActivity
++        assertEquals(Settings.ACTION_REQUEST_SET_AUTOFILL_SERVICE, intent.action)
++        assertEquals("package:${activity.packageName}", intent.data.toString())
++        controller.pause().resume()
++        assertTrue(choose.isEnabled)
++        controller.pause().stop().destroy()
++    }
++}
+diff --git a/app/src/test/java/com/kunzisoft/keepass/settings/DeviceSetupProfileTest.kt b/app/src/test/java/com/kunzisoft/keepass/settings/DeviceSetupProfileTest.kt
+new file mode 100644
+index 0000000..0776a77
+--- /dev/null
++++ b/app/src/test/java/com/kunzisoft/keepass/settings/DeviceSetupProfileTest.kt
+@@ -0,0 +1,22 @@
++// SPDX-License-Identifier: GPL-3.0-or-later
++package com.kunzisoft.keepass.settings
++
++import org.junit.Assert.assertEquals
++import org.junit.Test
++
++class DeviceSetupProfileTest {
++    @Test fun recognizesOemAndBrandAliases() {
++        assertEquals(DeviceSetupProfile.XIAOMI, DeviceSetupProfile.forManufacturer("Xiaomi", "Redmi"))
++        assertEquals(DeviceSetupProfile.XIAOMI, DeviceSetupProfile.forManufacturer("unknown", " POCO "))
++        assertEquals(DeviceSetupProfile.SAMSUNG, DeviceSetupProfile.forManufacturer("SAMSUNG", "samsung"))
++        assertEquals(DeviceSetupProfile.COLOROS, DeviceSetupProfile.forManufacturer("OnePlus", "OnePlus"))
++        assertEquals(DeviceSetupProfile.COLOROS, DeviceSetupProfile.forManufacturer("OPPO", "realme"))
++        assertEquals(DeviceSetupProfile.VIVO, DeviceSetupProfile.forManufacturer("vivo", "iQOO"))
++    }
++
++    @Test fun unknownNamesUseGenericInstructions() {
++        assertEquals(DeviceSetupProfile.GENERIC, DeviceSetupProfile.forManufacturer("Google", "google"))
++        assertEquals(DeviceSetupProfile.GENERIC, DeviceSetupProfile.forManufacturer("", ""))
++        assertEquals(DeviceSetupProfile.GENERIC, DeviceSetupProfile.forManufacturer("not-xiaomi", "other"))
++    }
++}

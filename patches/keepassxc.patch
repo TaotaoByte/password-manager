@@ -1,0 +1,2035 @@
+diff --git a/share/translations/keepassxc_zh_CN.ts b/share/translations/keepassxc_zh_CN.ts
+index 3fb5bbf..e44bbac 100644
+--- a/share/translations/keepassxc_zh_CN.ts
++++ b/share/translations/keepassxc_zh_CN.ts
+@@ -10656,6 +10656,58 @@ Example: JBSWY3DPEHPK3PXP</source>
+         <source>Import File</source>
+         <translation>导入文件</translation>
+     </message>
++    <message>
++        <source>Local encryption. Your own vault.</source>
++        <translation>本地加密，由你保管。</translation>
++    </message>
++    <message>
++        <source>Local password vault</source>
++        <translation>本地密码库</translation>
++    </message>
++    <message>
++        <source>Save website and app logins. Find them when you need them.</source>
++        <translation>保存网站和软件账号，需要时快速找到。</translation>
++    </message>
++    <message>
++        <source>Create vault</source>
++        <translation>创建密码库</translation>
++    </message>
++    <message>
++        <source>Open vault</source>
++        <translation>打开密码库</translation>
++    </message>
++    <message>
++        <source>Import existing accounts</source>
++        <translation>导入已有账号</translation>
++    </message>
++    <message>
++        <source>Quick save</source>
++        <translation>快捷保存</translation>
++    </message>
++    <message>
++        <source>Quick fill</source>
++        <translation>快捷填充</translation>
++    </message>
++    <message>
++        <source>Keep the app running to use shortcuts in other apps.</source>
++        <translation>保持程序运行，即可在其他软件中使用快捷键。</translation>
++    </message>
++    <message>
++        <source>Recent vaults</source>
++        <translation>最近使用的密码库</translation>
++    </message>
++    <message>
++        <source>No vault opened yet. Create one or open your existing file above.</source>
++        <translation>还没有打开密码库，可先创建一个，或打开已有文件。</translation>
++    </message>
++    <message>
++        <source>Based on KeePassXC · Encrypted KDBX files · Manual sync</source>
++        <translation>基于 KeePassXC · 加密文件存储 · 手动同步</translation>
++    </message>
++    <message>
++        <source>Not set</source>
++        <translation>未设置</translation>
++    </message>
+ </context>
+ <context>
+     <name>WinUtils</name>
+@@ -10816,4 +10868,4 @@ Example: JBSWY3DPEHPK3PXP</source>
+         <translation>未知</translation>
+     </message>
+ </context>
+-</TS>
+\ No newline at end of file
++</TS>
+diff --git a/src/browser/BrowserMessageBuilder.cpp b/src/browser/BrowserMessageBuilder.cpp
+index e8a9b83..26b8904 100644
+--- a/src/browser/BrowserMessageBuilder.cpp
++++ b/src/browser/BrowserMessageBuilder.cpp
+@@ -58,7 +58,9 @@ QJsonObject BrowserMessageBuilder::getErrorReply(const QString& action, const in
+ QJsonObject BrowserMessageBuilder::buildMessage(const QString& nonce) const
+ {
+     QJsonObject message;
+-    message["version"] = KEEPASSXC_VERSION;
++    // Official extensions compare three numeric components. Product suffixes can
++    // otherwise make 2.8.0-localvault.1 appear older than the supported 2.8.0 API.
++    message["version"] = QStringLiteral(KEEPASSXC_VERSION).section(QLatin1Char('-'), 0, 0);
+     message["success"] = TRUE_STR;
+     message["nonce"] = nonce;
+     return message;
+diff --git a/src/browser/BrowserSettings.cpp b/src/browser/BrowserSettings.cpp
+index 0a8226c..10defbd 100644
+--- a/src/browser/BrowserSettings.cpp
++++ b/src/browser/BrowserSettings.cpp
+@@ -18,6 +18,7 @@
+  */
+ 
+ #include "BrowserSettings.h"
++#include <QRegularExpression>
+ #include "core/Config.h"
+ #include "core/PasswordHealth.h"
+ #include <QDir>
+@@ -215,10 +216,12 @@ QString BrowserSettings::proxyLocationAsInstalled() const
+     return m_nativeMessageInstaller.getInstalledProxyPath();
+ }
+ 
+-#ifdef QT_DEBUG
++#if defined(QT_DEBUG) || defined(Q_OS_WIN)
+ QString BrowserSettings::customExtensionId()
+ {
+-    return config()->get(Config::Browser_CustomExtensionId).toString();
++    static const QRegularExpression chromiumId(QStringLiteral("\\A[a-p]{32}\\z"));
++    const auto id = config()->get(Config::Browser_CustomExtensionId).toString().trimmed();
++    return chromiumId.match(id).hasMatch() ? id : QString();
+ }
+ 
+ void BrowserSettings::setCustomExtensionId(const QString& id)
+diff --git a/src/browser/BrowserSettings.h b/src/browser/BrowserSettings.h
+index 9c0b371..174d5c5 100644
+--- a/src/browser/BrowserSettings.h
++++ b/src/browser/BrowserSettings.h
+@@ -60,7 +60,7 @@ public:
+     void setCustomProxyLocation(const QString& location);
+     QString proxyLocation();
+     QString proxyLocationAsInstalled() const;
+-#ifdef QT_DEBUG
++#if defined(QT_DEBUG) || defined(Q_OS_WIN)
+     QString customExtensionId();
+     void setCustomExtensionId(const QString& id);
+ #endif
+diff --git a/src/browser/BrowserSettingsWidget.cpp b/src/browser/BrowserSettingsWidget.cpp
+index 5a4ccce..e66c267 100644
+--- a/src/browser/BrowserSettingsWidget.cpp
++++ b/src/browser/BrowserSettingsWidget.cpp
+@@ -23,6 +23,7 @@
+ #include "gui/styles/StateColorPalette.h"
+ 
+ #include <QFileDialog>
++#include <QRegularExpressionValidator>
+ 
+ BrowserSettingsWidget::BrowserSettingsWidget(QWidget* parent)
+     : QWidget(parent)
+@@ -84,9 +85,12 @@ BrowserSettingsWidget::BrowserSettingsWidget(QWidget* parent)
+     m_ui->firefoxSupport->setText("Firefox and Tor Browser");
+ #endif
+ 
+-#ifndef QT_DEBUG
+-    m_ui->customExtensionId->setVisible(false);
+-    m_ui->customExtensionLabel->setVisible(false);
++#if defined(QT_DEBUG) || defined(Q_OS_WIN)
++    m_ui->customExtensionId->setMaxLength(32);
++    m_ui->customExtensionId->setValidator(
++        new QRegularExpressionValidator(QRegularExpression(QStringLiteral("[a-p]{32}")), m_ui->customExtensionId));
++#else
++    m_ui->customExtensionIdContainer->hide();
+ #endif
+ }
+ 
+@@ -167,7 +171,7 @@ void BrowserSettingsWidget::loadSettings()
+     }
+     m_ui->customBrowserLocation->setText(settings->replaceHomePath(settings->customBrowserLocation()));
+ 
+-#ifdef QT_DEBUG
++#if defined(QT_DEBUG) || defined(Q_OS_WIN)
+     m_ui->customExtensionId->setText(settings->customExtensionId());
+ #endif
+     // Validate the complete proxy location dependency - not only in case it is custom,
+@@ -242,8 +246,10 @@ void BrowserSettingsWidget::saveSettings()
+     settings->setAllowLocalhostWithPasskeys(m_ui->allowLocalhostWithPasskeys->isChecked());
+     settings->setNoMigrationPrompt(m_ui->noMigrationPrompt->isChecked());
+ 
+-#ifdef QT_DEBUG
+-    settings->setCustomExtensionId(m_ui->customExtensionId->text());
++#if defined(QT_DEBUG) || defined(Q_OS_WIN)
++    if (m_ui->customExtensionId->text().isEmpty() || m_ui->customExtensionId->hasAcceptableInput()) {
++        settings->setCustomExtensionId(m_ui->customExtensionId->text());
++    }
+ #endif
+ 
+     settings->setBrowserSupport(BrowserShared::CHROME, m_ui->chromeSupport->isChecked());
+diff --git a/src/browser/NativeMessageInstaller.cpp b/src/browser/NativeMessageInstaller.cpp
+index 21a6626..1037709 100644
+--- a/src/browser/NativeMessageInstaller.cpp
++++ b/src/browser/NativeMessageInstaller.cpp
+@@ -344,7 +344,7 @@ QJsonObject NativeMessageInstaller::constructFile(SupportedBrowsers browser)
+         for (const QString& origin : ALLOWED_ORIGINS) {
+             arr.append(origin);
+         }
+-#ifdef QT_DEBUG
++#if defined(QT_DEBUG) || defined(Q_OS_WIN)
+         auto customId = browserSettings()->customExtensionId();
+         if (!customId.isEmpty()) {
+             arr.append(QString("chrome-extension://%1/").arg(customId));
+diff --git a/src/core/Config.cpp b/src/core/Config.cpp
+index 209113b..a123f77 100644
+--- a/src/core/Config.cpp
++++ b/src/core/Config.cpp
+@@ -89,8 +89,14 @@ static const QHash<Config::ConfigKey, ConfigDirective> configStrings = {
+     {Config::AutoTypeDesktopPortalPersistMode,{QS("AutoTypeDesktopPortalPersistMode"), Roaming, 1}},
+     {Config::AutoTypeDesktopPortalRestoreToken,{QS("AutoTypeDesktopPortalRestoreToken"), Local, ""}},
+     {Config::AutoTypePreferDesktopPortals,{QS("AutoTypePreferDesktopPortals"), Roaming, false}},
++    {Config::QuickSaveShortcut,{QS("LocalVault/QuickSaveShortcut"), Local, QString("Ctrl+Alt+S")}},
++#ifdef Q_OS_WIN
++    {Config::GlobalAutoTypeKey,{QS("GlobalAutoTypeKey"), Roaming, int(Qt::Key_A)}},
++    {Config::GlobalAutoTypeModifiers,{QS("GlobalAutoTypeModifiers"), Roaming, int(Qt::ControlModifier | Qt::AltModifier)}},
++#else
+     {Config::GlobalAutoTypeKey,{QS("GlobalAutoTypeKey"), Roaming, 0}},
+     {Config::GlobalAutoTypeModifiers,{QS("GlobalAutoTypeModifiers"), Roaming, 0}},
++#endif
+     {Config::GlobalAutoTypeRetypeTime,{QS("GlobalAutoTypeRetypeTime"), Roaming, 15}},
+     {Config::FaviconDownloadTimeout,{QS("FaviconDownloadTimeout"), Roaming, 10}},
+     {Config::UpdateCheckMessageShown,{QS("UpdateCheckMessageShown"), Roaming, false}},
+@@ -188,7 +194,7 @@ static const QHash<Config::ConfigKey, ConfigDirective> configStrings = {
+     {Config::Browser_CustomBrowserType, {QS("Browser/CustomBrowserType"), Local, -1}},
+     {Config::Browser_CustomBrowserLocation, {QS("Browser/CustomBrowserLocation"), Local, {}}},
+     {Config::Browser_AllowLocalhostWithPasskeys, {QS("Browser/Browser_AllowLocalhostWithPasskeys"), Roaming, false}},
+-#ifdef QT_DEBUG
++#if defined(QT_DEBUG) || defined(Q_OS_WIN)
+     {Config::Browser_CustomExtensionId, {QS("Browser/CustomExtensionId"), Local, {}}},
+ #endif
+ 
+diff --git a/src/core/Config.h b/src/core/Config.h
+index fe59ad5..34102be 100644
+--- a/src/core/Config.h
++++ b/src/core/Config.h
+@@ -71,6 +71,7 @@ public:
+         AutoTypeDesktopPortalRestoreToken,
+         AutoTypePreferDesktopPortals,
+         GlobalAutoTypeKey,
++        QuickSaveShortcut,
+         GlobalAutoTypeModifiers,
+         GlobalAutoTypeRetypeTime,
+         FaviconDownloadTimeout,
+@@ -166,7 +167,7 @@ public:
+         Browser_CustomBrowserType,
+         Browser_CustomBrowserLocation,
+         Browser_AllowLocalhostWithPasskeys,
+-#ifdef QT_DEBUG
++#if defined(QT_DEBUG) || defined(Q_OS_WIN)
+         Browser_CustomExtensionId,
+ #endif
+ 
+diff --git a/src/core/Entry.cpp b/src/core/Entry.cpp
+index 121e4d0..3c2ad87 100644
+--- a/src/core/Entry.cpp
++++ b/src/core/Entry.cpp
+@@ -37,8 +37,8 @@ const int Entry::DefaultIconNumber = 0;
+ 
+ namespace
+ {
+-    const QString AutoTypeSequenceUsername = "{USERNAME}{ENTER}";
+-    const QString AutoTypeSequencePassword = "{PASSWORD}{ENTER}";
++    const QString AutoTypeSequenceUsername = "{USERNAME}";
++    const QString AutoTypeSequencePassword = "{PASSWORD}";
+     const QRegularExpression TagDelimiterRegex(R"([,;\t])");
+ } // namespace
+ 
+diff --git a/src/core/Group.cpp b/src/core/Group.cpp
+index 4b74413..4bf962c 100644
+--- a/src/core/Group.cpp
++++ b/src/core/Group.cpp
+@@ -29,7 +29,7 @@
+ const int Group::DefaultIconNumber = 48;
+ const int Group::OpenFolderIconNumber = 49;
+ const int Group::RecycleBinIconNumber = 43;
+-const QString Group::RootAutoTypeSequence = "{USERNAME}{TAB}{PASSWORD}{ENTER}";
++const QString Group::RootAutoTypeSequence = "{USERNAME}{TAB}{PASSWORD}";
+ 
+ Group::Group()
+     : m_customData(new CustomData(this))
+diff --git a/src/gui/DatabaseWidget.cpp b/src/gui/DatabaseWidget.cpp
+index 2f5c6c7..fb7aed6 100644
+--- a/src/gui/DatabaseWidget.cpp
++++ b/src/gui/DatabaseWidget.cpp
+@@ -34,6 +34,7 @@
+ #include "autotype/AutoType.h"
+ #include "core/AsyncTask.h"
+ #include "core/EntrySearcher.h"
++#include "core/QuickSave.h"
+ #include "core/Merger.h"
+ #include "core/Tools.h"
+ #include "gui/Clipboard.h"
+@@ -471,6 +472,21 @@ void DatabaseWidget::createEntry()
+     switchToEntryEdit(m_newEntry.data(), true);
+ }
+ 
++void DatabaseWidget::createEntryForWindow(const QString& windowTitle)
++{
++    // Use the existing pending-entry transaction: Cancel never inserts an entry.
++    if (isLocked() || currentMode() != Mode::ViewMode || !currentGroup() || isRecycleBinSelected()) {
++        return;
++    }
++    m_newEntry.reset(new Entry());
++    m_newEntry->setUuid(QUuid::createUuid());
++    m_newEntry->setUsername(m_db->metadata()->defaultUserName());
++    m_newParent = currentGroup();
++    m_newParent->applyGroupIconOnCreateTo(m_newEntry.data());
++    QuickSave::prepareEntry(m_newEntry.data(), windowTitle);
++    switchToEntryEdit(m_newEntry.data(), true);
++}
++
+ void DatabaseWidget::replaceDatabase(QSharedPointer<Database> db)
+ {
+     Q_ASSERT(!isEntryEditActive() && !isGroupEditActive());
+diff --git a/src/gui/DatabaseWidget.h b/src/gui/DatabaseWidget.h
+index 82a261e..23b4d96 100644
+--- a/src/gui/DatabaseWidget.h
++++ b/src/gui/DatabaseWidget.h
+@@ -182,6 +182,7 @@ public slots:
+ 
+     void replaceDatabase(QSharedPointer<Database> db);
+     void createEntry();
++    void createEntryForWindow(const QString& windowTitle);
+     void cloneEntry();
+     void expireSelectedEntries();
+     void deleteSelectedEntries();
+diff --git a/src/gui/MainWindow.cpp b/src/gui/MainWindow.cpp
+index 8c93c7c..3af1a5f 100644
+--- a/src/gui/MainWindow.cpp
++++ b/src/gui/MainWindow.cpp
+@@ -46,6 +46,7 @@
+ #include "gui/Icons.h"
+ #include "gui/MessageBox.h"
+ #include "gui/SearchWidget.h"
++#include "gui/QuickSaveController.h"
+ #include "gui/ShortcutSettingsPage.h"
+ #include "gui/entry/EntryView.h"
+ #include "gui/osutils/OSUtils.h"
+@@ -76,7 +77,7 @@
+ #include "mainwindowadaptor.h"
+ #endif
+ 
+-const QString MainWindow::BaseWindowTitle = "KeePassXC";
++const QString MainWindow::BaseWindowTitle = "LocalVault · KeePassXC";
+ 
+ MainWindow* g_MainWindow = nullptr;
+ MainWindow* getMainWindow()
+@@ -106,6 +107,9 @@ MainWindow::MainWindow()
+ 
+     if (config()->get(Config::GUI_CompactMode).toBool()) {
+         m_ui->toolBar->setIconSize({20, 20});
++    } else if (auto* createButton = qobject_cast<QToolButton*>(m_ui->toolBar->widgetForAction(m_ui->actionEntryNew))) {
++        createButton->setObjectName("entryCreateButton");
++        createButton->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+     }
+ 
+     // Setup the search widget in the toolbar
+@@ -273,6 +277,10 @@ MainWindow::MainWindow()
+     connect(m_inactivityTimer, SIGNAL(inactivityDetected()), this, SLOT(lockAllDatabases()));
+     applySettingsChanges();
+ 
++#ifdef Q_OS_WIN
++    new QuickSaveController(this, m_ui->menuTools, [this](const QString& title) { quickSaveFromWindow(title); });
++#endif
++
+     connect(m_ui->menuEntries, SIGNAL(aboutToShow()), SLOT(obtainContextFocusLock()));
+     connect(m_ui->menuEntries, SIGNAL(aboutToHide()), SLOT(releaseContextFocusLock()));
+     connect(m_entryContextMenu, SIGNAL(aboutToShow()), SLOT(obtainContextFocusLock()));
+@@ -846,6 +854,9 @@ void MainWindow::updateMenuActionState()
+     bool hasLockableDatabase = m_ui->tabWidget->hasLockableDatabases();
+     bool inAppSettings = (currentIndex == SettingsScreen);
+     bool inPasswordGenerator = (currentIndex == PasswordGeneratorScreen);
++    // The welcome page has its own actions; avoid a row of disabled vault tools.
++    m_ui->toolBar->setVisible(currentIndex != WelcomeScreen
++                             && !config()->get(Config::GUI_HideToolbar).toBool());
+ 
+     auto dbWidget = (currentIndex == DatabaseTabScreen ? m_ui->tabWidget->currentDatabaseWidget() : nullptr);
+     auto dbMode = (dbWidget ? dbWidget->currentMode() : DatabaseWidget::Mode::None);
+@@ -1637,6 +1648,40 @@ void MainWindow::showGroupContextMenu(const QPoint& globalPos)
+     m_ui->menuGroups->popup(globalPos);
+ }
+ 
++void MainWindow::quickSaveFromWindow(const QString& title)
++{
++    if (QApplication::activeModalWidget()) return;
++    auto dbWidget = m_ui->tabWidget->currentDatabaseWidget();
++    bringToFront();
++    if (!dbWidget) {
++        displayGlobalMessage(QStringLiteral("请先创建或打开密码库，再使用快捷保存。"), MessageWidget::Information);
++        return;
++    }
++    if (dbWidget->isLocked()) {
++        // Keep only the non-secret title while the upstream unlock dialog is open.
++        auto connection = QSharedPointer<QMetaObject::Connection>::create();
++        const QPointer<DatabaseWidget> target(dbWidget);
++        *connection = connect(this, &MainWindow::databaseUnlockDialogFinished, this,
++            [this, connection, target, title](bool accepted, DatabaseWidget* unlocked) {
++                disconnect(*connection);
++                if (accepted && target && target == unlocked) {
++                    QTimer::singleShot(0, this, [this, target, title] {
++                        if (target && m_ui->tabWidget->currentDatabaseWidget() == target) quickSaveFromWindow(title);
++                    });
++                }
++            });
++        m_ui->tabWidget->unlockDatabaseInDialog(dbWidget, DatabaseOpenDialog::Intent::None);
++        return;
++    }
++    if (m_ui->stackedWidget->currentIndex() != DatabaseTabScreen
++        || dbWidget->currentMode() != DatabaseWidget::Mode::ViewMode || dbWidget->isRecycleBinSelected()) {
++        displayGlobalMessage(QStringLiteral("请先结束当前编辑或设置，并选择普通分组，再使用快捷保存。"),
++                             MessageWidget::Information);
++        return;
++    }
++    dbWidget->createEntryForWindow(title);
++}
++
+ void MainWindow::applySettingsChanges()
+ {
+     if (config()->get(Config::Security_LockDatabaseIdle).toBool()) {
+@@ -1658,7 +1703,8 @@ void MainWindow::applySettingsChanges()
+     m_ui->menubar->setMaximumHeight(hideMenubar ? 0 : QWIDGETSIZE_MAX);
+ #endif
+ 
+-    m_ui->toolBar->setHidden(config()->get(Config::GUI_HideToolbar).toBool());
++    m_ui->toolBar->setHidden(config()->get(Config::GUI_HideToolbar).toBool()
++                             || m_ui->stackedWidget->currentIndex() == WelcomeScreen);
+     auto movable = config()->get(Config::GUI_MovableToolbar).toBool();
+     m_ui->toolBar->setMovable(movable);
+     if (!movable) {
+diff --git a/src/gui/MainWindow.h b/src/gui/MainWindow.h
+index c7539ef..fa0167f 100644
+--- a/src/gui/MainWindow.h
++++ b/src/gui/MainWindow.h
+@@ -165,6 +165,7 @@ private:
+     bool saveLastDatabases();
+     bool isTrayIconEnabled() const;
+     void customOpenUrl(QString url);
++    void quickSaveFromWindow(const QString& title);
+ 
+     static QStringList kdbxFilesFromUrls(const QList<QUrl>& urls);
+     void dragEnterEvent(QDragEnterEvent* event) override;
+diff --git a/src/gui/MainWindow.ui b/src/gui/MainWindow.ui
+index 79f2ab3..11f5acc 100644
+--- a/src/gui/MainWindow.ui
++++ b/src/gui/MainWindow.ui
+@@ -9,14 +9,14 @@
+    <rect>
+     <x>0</x>
+     <y>0</y>
+-    <width>800</width>
+-    <height>600</height>
++    <width>1040</width>
++    <height>720</height>
+    </rect>
+   </property>
+   <property name="minimumSize">
+    <size>
+     <width>800</width>
+-    <height>500</height>
++    <height>560</height>
+    </size>
+   </property>
+   <property name="windowTitle">
+@@ -123,7 +123,16 @@
+       </widget>
+       <widget class="QWidget" name="pageWelcome">
+        <layout class="QVBoxLayout" name="verticalLayout_5">
++        <property name="leftMargin"><number>0</number></property>
++        <property name="topMargin"><number>0</number></property>
++        <property name="rightMargin"><number>0</number></property>
++        <property name="bottomMargin"><number>0</number></property>
+         <item>
++         <widget class="QScrollArea" name="welcomeScrollArea">
++          <property name="frameShape"><enum>QFrame::NoFrame</enum></property>
++          <property name="widgetResizable"><bool>true</bool></property>
++          <property name="horizontalScrollBarPolicy"><enum>Qt::ScrollBarAlwaysOff</enum></property>
++          <widget class="QWidget" name="welcomeContent">
+          <layout class="QHBoxLayout" name="horizontalLayout">
+           <item>
+            <spacer name="horizontalSpacer">
+@@ -135,7 +144,7 @@
+             </property>
+             <property name="sizeHint" stdset="0">
+              <size>
+-              <width>50</width>
++              <width>18</width>
+               <height>20</height>
+              </size>
+             </property>
+@@ -154,13 +163,15 @@
+             </property>
+             <property name="sizeHint" stdset="0">
+              <size>
+-              <width>50</width>
++              <width>18</width>
+               <height>20</height>
+              </size>
+             </property>
+            </spacer>
+           </item>
+          </layout>
++          </widget>
++         </widget>
+         </item>
+        </layout>
+       </widget>
+diff --git a/src/gui/WelcomeWidget.cpp b/src/gui/WelcomeWidget.cpp
+index 98b0e36..bacdcb5 100644
+--- a/src/gui/WelcomeWidget.cpp
++++ b/src/gui/WelcomeWidget.cpp
+@@ -19,6 +19,9 @@
+ #include "WelcomeWidget.h"
+ #include "ui_WelcomeWidget.h"
+ #include <QKeyEvent>
++#include <QFileInfo>
++#include <QDir>
++#include <QKeySequence>
+ 
+ #include "config-keepassx.h"
+ #include "core/Config.h"
+@@ -30,19 +33,12 @@ WelcomeWidget::WelcomeWidget(QWidget* parent)
+ {
+     m_ui->setupUi(this);
+ 
+-    m_ui->welcomeLabel->setText(tr("Welcome to KeePassXC %1").arg(KEEPASSXC_VERSION));
+-    QFont welcomeLabelFont = m_ui->welcomeLabel->font();
+-    welcomeLabelFont.setBold(true);
+-    welcomeLabelFont.setPointSize(welcomeLabelFont.pointSize() + 4);
+-    m_ui->welcomeLabel->setFont(welcomeLabelFont);
+-
+-    m_ui->iconLabel->setPixmap(icons()->applicationIcon().pixmap(64));
+     m_ui->buttonNewDatabase->setIcon(icons()->icon("document-new"));
+-    m_ui->buttonNewDatabase->setStyleSheet("text-align:center;");
+     m_ui->buttonOpenDatabase->setIcon(icons()->icon("document-open"));
+-    m_ui->buttonOpenDatabase->setStyleSheet("text-align:center;");
+     m_ui->buttonImport->setIcon(icons()->icon("document-import"));
+-    m_ui->buttonImport->setStyleSheet("text-align:center;");
++    m_ui->buttonNewDatabase->setIconSize({18, 18});
++    m_ui->buttonOpenDatabase->setIconSize({18, 18});
++    m_ui->buttonImport->setIconSize({16, 16});
+ 
+     refreshLastDatabases();
+ 
+@@ -62,7 +58,8 @@ void WelcomeWidget::openDatabaseFromFile(QListWidgetItem* item)
+     if (!item || item->text().isEmpty()) {
+         return;
+     }
+-    emit openDatabaseFile(item->text());
++    const auto file = item->data(Qt::UserRole).toString();
++    emit openDatabaseFile(file.isEmpty() ? item->text() : file);
+ }
+ 
+ void WelcomeWidget::removeFromLastDatabases(QListWidgetItem* item)
+@@ -73,7 +70,8 @@ void WelcomeWidget::removeFromLastDatabases(QListWidgetItem* item)
+ 
+     if (config()->get(Config::RememberLastDatabases).toBool()) {
+         QStringList lastDatabases = config()->get(Config::LastDatabases).toStringList();
+-        lastDatabases.removeOne(item->text());
++        const auto file = item->data(Qt::UserRole).toString();
++        lastDatabases.removeOne(file.isEmpty() ? item->text() : file);
+         config()->set(Config::LastDatabases, lastDatabases);
+     }
+     refreshLastDatabases();
+@@ -85,14 +83,27 @@ void WelcomeWidget::refreshLastDatabases()
+     const QStringList lastDatabases = config()->get(Config::LastDatabases).toStringList();
+     for (const QString& database : lastDatabases) {
+         auto itm = new QListWidgetItem;
+-        itm->setText(database);
++        const QFileInfo file(database);
++        itm->setText(file.fileName() + QStringLiteral("   ·   ") + file.dir().dirName());
++        itm->setData(Qt::UserRole, database);
++        itm->setToolTip(database);
++        itm->setIcon(icons()->icon("document-open"));
++        itm->setSizeHint({0, 42});
+         m_ui->recentListWidget->addItem(itm);
+     }
+ 
+-    bool recent_visibility = (m_ui->recentListWidget->count() > 0);
++    const bool recent_visibility = m_ui->recentListWidget->count() > 0;
+     m_ui->startLabel->setVisible(!recent_visibility);
+     m_ui->recentListWidget->setVisible(recent_visibility);
+-    m_ui->recentLabel->setVisible(recent_visibility);
++    m_ui->recentLabel->setVisible(true);
++
++    auto quickSave = config()->get(Config::QuickSaveShortcut).toString();
++    m_ui->saveShortcutKey->setText(quickSave.isEmpty() ? tr("Not set")
++        : QKeySequence::fromString(quickSave, QKeySequence::PortableText).toString(QKeySequence::NativeText));
++    const auto key = static_cast<Qt::Key>(config()->get(Config::GlobalAutoTypeKey).toInt());
++    const auto modifiers = Qt::KeyboardModifiers(config()->get(Config::GlobalAutoTypeModifiers).toInt());
++    m_ui->fillShortcutKey->setText(key > 0
++        ? QKeySequence(modifiers | key).toString(QKeySequence::NativeText) : tr("Not set"));
+ }
+ 
+ void WelcomeWidget::keyPressEvent(QKeyEvent* event)
+diff --git a/src/gui/WelcomeWidget.ui b/src/gui/WelcomeWidget.ui
+index 7a753e0..1155a8f 100644
+--- a/src/gui/WelcomeWidget.ui
++++ b/src/gui/WelcomeWidget.ui
+@@ -2,202 +2,374 @@
+ <ui version="4.0">
+  <class>WelcomeWidget</class>
+  <widget class="QWidget" name="WelcomeWidget">
+-  <property name="geometry">
+-   <rect>
+-    <x>0</x>
+-    <y>0</y>
+-    <width>450</width>
+-    <height>419</height>
+-   </rect>
+-  </property>
+   <property name="sizePolicy">
+-   <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
++   <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
+     <horstretch>0</horstretch>
+     <verstretch>0</verstretch>
+    </sizepolicy>
+   </property>
+   <property name="minimumSize">
+    <size>
+-    <width>450</width>
++    <width>650</width>
+     <height>0</height>
+    </size>
+   </property>
++  <property name="maximumSize">
++   <size>
++    <width>920</width>
++    <height>16777215</height>
++   </size>
++  </property>
+   <layout class="QVBoxLayout" name="verticalLayout">
++   <property name="spacing">
++    <number>12</number>
++   </property>
++   <property name="leftMargin">
++    <number>20</number>
++   </property>
++   <property name="topMargin">
++    <number>18</number>
++   </property>
++   <property name="rightMargin">
++    <number>20</number>
++   </property>
++   <property name="bottomMargin">
++    <number>18</number>
++   </property>
+    <item>
+-    <layout class="QHBoxLayout" name="horizontalLayout">
+-     <item>
+-      <spacer name="horizontalSpacer">
+-       <property name="orientation">
+-        <enum>Qt::Horizontal</enum>
+-       </property>
+-       <property name="sizeHint" stdset="0">
+-        <size>
+-         <width>40</width>
+-         <height>20</height>
+-        </size>
+-       </property>
+-      </spacer>
+-     </item>
+-     <item>
+-      <layout class="QVBoxLayout" name="verticalLayout_2">
+-       <item>
+-        <widget class="QLabel" name="iconLabel">
+-         <property name="sizePolicy">
+-          <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+-           <horstretch>0</horstretch>
+-           <verstretch>0</verstretch>
+-          </sizepolicy>
+-         </property>
+-         <property name="alignment">
+-          <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+-         </property>
+-        </widget>
+-       </item>
+-      </layout>
+-     </item>
+-     <item>
+-      <spacer name="horizontalSpacer_2">
+-       <property name="orientation">
+-        <enum>Qt::Horizontal</enum>
+-       </property>
+-       <property name="sizeHint" stdset="0">
+-        <size>
+-         <width>40</width>
+-         <height>20</height>
+-        </size>
+-       </property>
+-      </spacer>
+-     </item>
+-    </layout>
+-   </item>
+-   <item>
+-    <spacer name="verticalSpacer_3">
++    <spacer name="topSpace">
+      <property name="orientation">
+       <enum>Qt::Vertical</enum>
+      </property>
+-     <property name="sizeType">
+-      <enum>QSizePolicy::Fixed</enum>
+-     </property>
+      <property name="sizeHint" stdset="0">
+       <size>
+-       <width>20</width>
+-       <height>20</height>
++       <width>0</width>
++       <height>8</height>
+       </size>
+      </property>
+     </spacer>
+    </item>
+    <item>
+-    <widget class="QLabel" name="welcomeLabel">
+-     <property name="alignment">
+-      <set>Qt::AlignCenter</set>
+-     </property>
+-    </widget>
+-   </item>
+-   <item>
+-    <widget class="QLabel" name="startLabel">
+-     <property name="text">
+-      <string>Start storing your passwords securely in a KeePassXC database</string>
+-     </property>
+-     <property name="alignment">
+-      <set>Qt::AlignCenter</set>
+-     </property>
+-    </widget>
+-   </item>
+-   <item>
+-    <spacer name="verticalSpacer">
+-     <property name="orientation">
+-      <enum>Qt::Vertical</enum>
+-     </property>
+-     <property name="sizeType">
+-      <enum>QSizePolicy::Fixed</enum>
++    <layout class="QHBoxLayout" name="overview" stretch="3,2">
++     <property name="spacing">
++      <number>16</number>
+      </property>
+-     <property name="sizeHint" stdset="0">
+-      <size>
+-       <width>20</width>
+-       <height>20</height>
+-      </size>
+-     </property>
+-    </spacer>
+-   </item>
+-   <item>
+-    <layout class="QHBoxLayout" name="horizontalLayout_2">
+      <item>
+-      <widget class="QPushButton" name="buttonNewDatabase">
+-       <property name="text">
+-        <string>Create Database</string>
+-       </property>
++      <widget class="QFrame" name="introPanel">
++       <layout class="QVBoxLayout" name="introLayout">
++        <property name="leftMargin">
++         <number>28</number>
++        </property>
++        <property name="rightMargin">
++         <number>28</number>
++        </property>
++        <property name="topMargin">
++         <number>26</number>
++        </property>
++        <property name="bottomMargin">
++         <number>26</number>
++        </property>
++        <property name="spacing">
++         <number>14</number>
++        </property>
++        <item>
++         <layout class="QHBoxLayout" name="brandLayout">
++          <property name="spacing">
++           <number>12</number>
++          </property>
++          <item>
++           <widget class="QLabel" name="iconLabel">
++            <property name="minimumSize">
++             <size>
++              <width>52</width>
++              <height>52</height>
++             </size>
++            </property>
++            <property name="maximumSize">
++             <size>
++              <width>52</width>
++              <height>52</height>
++             </size>
++            </property>
++            <property name="text">
++             <string notr="true">LV</string>
++            </property>
++            <property name="alignment">
++             <set>Qt::AlignCenter</set>
++            </property>
++           </widget>
++          </item>
++          <item>
++           <layout class="QVBoxLayout" name="brandTextLayout">
++            <property name="spacing">
++             <number>3</number>
++            </property>
++            <item>
++             <widget class="QLabel" name="brandLabel">
++              <property name="text">
++               <string notr="true">LocalVault</string>
++              </property>
++             </widget>
++            </item>
++            <item>
++             <widget class="QLabel" name="brandDescription">
++              <property name="text">
++               <string>Local encryption. Your own vault.</string>
++              </property>
++             </widget>
++            </item>
++           </layout>
++          </item>
++          <item>
++           <spacer name="brandSpace">
++            <property name="orientation">
++             <enum>Qt::Horizontal</enum>
++            </property>
++            <property name="sizeHint" stdset="0">
++             <size>
++              <width>20</width>
++              <height>0</height>
++             </size>
++            </property>
++           </spacer>
++          </item>
++         </layout>
++        </item>
++        <item>
++         <widget class="QLabel" name="welcomeLabel">
++          <property name="text">
++            <string>Local password vault</string>
++          </property>
++          <property name="wordWrap">
++           <bool>true</bool>
++          </property>
++         </widget>
++        </item>
++        <item>
++         <widget class="QLabel" name="descriptionLabel">
++          <property name="text">
++           <string>Save website and app logins. Find them when you need them.</string>
++          </property>
++          <property name="wordWrap">
++           <bool>true</bool>
++          </property>
++         </widget>
++        </item>
++        <item>
++         <widget class="QLabel" name="footerLabel">
++          <property name="text">
++           <string>Based on KeePassXC · Encrypted KDBX files · Manual sync</string>
++          </property>
++          <property name="wordWrap">
++           <bool>true</bool>
++          </property>
++         </widget>
++        </item>
++       </layout>
+       </widget>
+      </item>
+      <item>
+-      <widget class="QPushButton" name="buttonOpenDatabase">
+-       <property name="text">
+-        <string>Open Database</string>
+-       </property>
+-      </widget>
+-     </item>
+-     <item>
+-      <widget class="QPushButton" name="buttonImport">
+-       <property name="text">
+-        <string>Import File</string>
+-       </property>
++      <widget class="QFrame" name="welcomeCard">
++       <layout class="QVBoxLayout" name="cardLayout">
++        <property name="sizeConstraint">
++         <enum>QLayout::SetMinimumSize</enum>
++        </property>
++        <property name="spacing">
++         <number>12</number>
++        </property>
++        <property name="leftMargin">
++         <number>28</number>
++        </property>
++        <property name="topMargin">
++         <number>20</number>
++        </property>
++        <property name="rightMargin">
++         <number>28</number>
++        </property>
++        <property name="bottomMargin">
++         <number>20</number>
++        </property>
++        <item>
++         <layout class="QVBoxLayout" name="actionLayout">
++          <property name="spacing">
++           <number>12</number>
++          </property>
++          <item>
++           <widget class="QPushButton" name="buttonNewDatabase">
++            <property name="minimumSize">
++             <size>
++              <width>0</width>
++              <height>44</height>
++             </size>
++            </property>
++            <property name="text">
++             <string>Create vault</string>
++            </property>
++           </widget>
++          </item>
++          <item>
++           <widget class="QPushButton" name="buttonOpenDatabase">
++            <property name="minimumSize">
++             <size>
++              <width>0</width>
++              <height>44</height>
++             </size>
++            </property>
++            <property name="text">
++             <string>Open vault</string>
++            </property>
++           </widget>
++          </item>
++         </layout>
++        </item>
++        <item>
++         <widget class="QPushButton" name="buttonImport">
++          <property name="text">
++           <string>Import existing accounts</string>
++          </property>
++          <property name="flat">
++           <bool>true</bool>
++          </property>
++         </widget>
++        </item>
++       </layout>
+       </widget>
+      </item>
+     </layout>
+    </item>
+    <item>
+-    <spacer name="verticalSpacer_2">
+-     <property name="orientation">
+-      <enum>Qt::Vertical</enum>
+-     </property>
+-     <property name="sizeType">
+-      <enum>QSizePolicy::Fixed</enum>
+-     </property>
+-     <property name="sizeHint" stdset="0">
+-      <size>
+-       <width>0</width>
+-       <height>20</height>
+-      </size>
+-     </property>
+-    </spacer>
++    <widget class="QFrame" name="shortcutCard">
++     <layout class="QHBoxLayout" name="shortcutsLayout">
++      <property name="spacing">
++       <number>18</number>
++      </property>
++      <property name="leftMargin">
++       <number>20</number>
++      </property>
++      <property name="topMargin">
++       <number>16</number>
++      </property>
++      <property name="rightMargin">
++       <number>20</number>
++      </property>
++      <property name="bottomMargin">
++       <number>16</number>
++      </property>
++      <item>
++       <layout class="QVBoxLayout" name="saveShortcutLayout">
++        <property name="spacing">
++         <number>6</number>
++        </property>
++        <item>
++         <widget class="QLabel" name="saveShortcutTitle">
++          <property name="text">
++           <string>Quick save</string>
++          </property>
++         </widget>
++        </item>
++        <item>
++         <widget class="QLabel" name="saveShortcutKey">
++          <property name="text">
++           <string notr="true">Ctrl+Alt+S</string>
++          </property>
++         </widget>
++        </item>
++       </layout>
++      </item>
++      <item>
++       <layout class="QVBoxLayout" name="fillShortcutLayout">
++        <property name="spacing">
++         <number>6</number>
++        </property>
++        <item>
++         <widget class="QLabel" name="fillShortcutTitle">
++          <property name="text">
++           <string>Quick fill</string>
++          </property>
++         </widget>
++        </item>
++        <item>
++         <widget class="QLabel" name="fillShortcutKey">
++          <property name="text">
++           <string notr="true">Ctrl+Alt+A</string>
++          </property>
++         </widget>
++        </item>
++       </layout>
++      </item>
++      <item>
++       <widget class="QLabel" name="shortcutDescription">
++        <property name="text">
++         <string>Keep the app running to use shortcuts in other apps.</string>
++        </property>
++        <property name="wordWrap">
++         <bool>true</bool>
++        </property>
++        <property name="maximumSize">
++         <size>
++          <width>220</width>
++          <height>16777215</height>
++         </size>
++        </property>
++       </widget>
++      </item>
++     </layout>
++    </widget>
+    </item>
+    <item>
+     <widget class="QLabel" name="recentLabel">
+      <property name="text">
+-      <string>Recent databases</string>
++      <string>Recent vaults</string>
+      </property>
+     </widget>
+    </item>
+    <item>
+-    <widget class="QListWidget" name="recentListWidget">
+-     <property name="sizePolicy">
+-      <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+-       <horstretch>0</horstretch>
+-       <verstretch>0</verstretch>
+-      </sizepolicy>
++    <widget class="QLabel" name="startLabel">
++     <property name="text">
++      <string>No vault opened yet. Create one or open your existing file above.</string>
+      </property>
+-     <property name="minimumSize">
+-      <size>
+-       <width>0</width>
+-       <height>0</height>
+-      </size>
++     <property name="wordWrap">
++      <bool>true</bool>
+      </property>
++    </widget>
++   </item>
++   <item>
++    <widget class="QListWidget" name="recentListWidget">
+      <property name="maximumSize">
+       <size>
+        <width>16777215</width>
+-       <height>110</height>
++       <height>120</height>
+       </size>
+      </property>
+      <property name="accessibleName">
+       <string>Open a recent database</string>
+      </property>
++     <property name="horizontalScrollBarPolicy">
++      <enum>Qt::ScrollBarAlwaysOff</enum>
++     </property>
+     </widget>
+    </item>
++   <item>
++    <spacer name="bottomSpace">
++     <property name="orientation">
++      <enum>Qt::Vertical</enum>
++     </property>
++     <property name="sizeHint" stdset="0">
++      <size>
++       <width>0</width>
++       <height>8</height>
++      </size>
++     </property>
++    </spacer>
++   </item>
+   </layout>
+  </widget>
+  <tabstops>
++  <tabstop>buttonNewDatabase</tabstop>
++  <tabstop>buttonOpenDatabase</tabstop>
+   <tabstop>buttonImport</tabstop>
+   <tabstop>recentListWidget</tabstop>
+  </tabstops>
+- <resources/>
+- <connections/>
++ <resources />
++ <connections />
+ </ui>
+diff --git a/src/gui/styles/base/BaseStyle.cpp b/src/gui/styles/base/BaseStyle.cpp
+index 9b41f4c..c35f65a 100644
+--- a/src/gui/styles/base/BaseStyle.cpp
++++ b/src/gui/styles/base/BaseStyle.cpp
+@@ -4231,6 +4231,10 @@ void BaseStyle::polish(QApplication* app)
+     }
+ 
+     stylesheet.append(getAppStyleSheet());
++    QFile localVaultStylesheet(QStringLiteral(":/styles/base/localvault.qss"));
++    if (localVaultStylesheet.open(QIODevice::ReadOnly | QIODevice::Text)) {
++        stylesheet.append(localVaultStylesheet.readAll());
++    }
+     app->setStyleSheet(stylesheet);
+     QCommonStyle::polish(app);
+ }
+diff --git a/src/gui/styles/dark/DarkStyle.cpp b/src/gui/styles/dark/DarkStyle.cpp
+index 3b86cfc..d87b4ac 100644
+--- a/src/gui/styles/dark/DarkStyle.cpp
++++ b/src/gui/styles/dark/DarkStyle.cpp
+@@ -39,64 +39,30 @@ DarkStyle::DarkStyle()
+ QPalette DarkStyle::standardPalette() const
+ {
+     auto palette = BaseStyle::standardPalette();
+-    palette.setColor(QPalette::Active, QPalette::Window, QRgb(0x3B3B3D));
+-    palette.setColor(QPalette::Inactive, QPalette::Window, QRgb(0x404042));
+-    palette.setColor(QPalette::Disabled, QPalette::Window, QRgb(0x424242));
+-
+-    palette.setColor(QPalette::Active, QPalette::WindowText, QRgb(0xCACBCE));
+-    palette.setColor(QPalette::Inactive, QPalette::WindowText, QRgb(0xC8C8C6));
+-    palette.setColor(QPalette::Disabled, QPalette::WindowText, QRgb(0x707070));
+-
+-    palette.setColor(QPalette::Active, QPalette::Text, QRgb(0xCACBCE));
+-    palette.setColor(QPalette::Inactive, QPalette::Text, QRgb(0xC8C8C6));
+-    palette.setColor(QPalette::Disabled, QPalette::Text, QRgb(0x707070));
+-
+-    palette.setColor(QPalette::Active, QPalette::PlaceholderText, QRgb(0x7D7D82));
+-    palette.setColor(QPalette::Inactive, QPalette::PlaceholderText, QRgb(0x87888C));
+-    palette.setColor(QPalette::Disabled, QPalette::PlaceholderText, QRgb(0x737373));
+-
+-    palette.setColor(QPalette::Active, QPalette::BrightText, QRgb(0x252627));
+-    palette.setColor(QPalette::Inactive, QPalette::BrightText, QRgb(0x2D2D2F));
+-    palette.setColor(QPalette::Disabled, QPalette::BrightText, QRgb(0x333333));
+-
+-    palette.setColor(QPalette::Active, QPalette::Base, QRgb(0x27272A));
+-    palette.setColor(QPalette::Inactive, QPalette::Base, QRgb(0x2A2A2D));
+-    palette.setColor(QPalette::Disabled, QPalette::Base, QRgb(0x343437));
+-
+-    palette.setColor(QPalette::Active, QPalette::AlternateBase, QRgb(0x2C2C30));
+-    palette.setColor(QPalette::Inactive, QPalette::AlternateBase, QRgb(0x2B2B2F));
+-    palette.setColor(QPalette::Disabled, QPalette::AlternateBase, QRgb(0x36363A));
+-
+-    palette.setColor(QPalette::All, QPalette::ToolTipBase, QRgb(0x2D532D));
+-    palette.setColor(QPalette::All, QPalette::ToolTipText, QRgb(0xBFBFBF));
+-
+-    palette.setColor(QPalette::Active, QPalette::Button, QRgb(0x28282B));
+-    palette.setColor(QPalette::Inactive, QPalette::Button, QRgb(0x28282B));
+-    palette.setColor(QPalette::Disabled, QPalette::Button, QRgb(0x2B2A2A));
+-
+-    palette.setColor(QPalette::Active, QPalette::ButtonText, QRgb(0xB9B9BE));
+-    palette.setColor(QPalette::Inactive, QPalette::ButtonText, QRgb(0x9E9FA5));
+-    palette.setColor(QPalette::Disabled, QPalette::ButtonText, QRgb(0x73747E));
+-
+-    palette.setColor(QPalette::Active, QPalette::Highlight, QRgb(0x2D532D));
+-    palette.setColor(QPalette::Inactive, QPalette::Highlight, QRgb(0x354637));
+-    palette.setColor(QPalette::Disabled, QPalette::Highlight, QRgb(0x293D29));
+-
+-    palette.setColor(QPalette::Active, QPalette::HighlightedText, QRgb(0xCCCCCC));
+-    palette.setColor(QPalette::Inactive, QPalette::HighlightedText, QRgb(0xCECECE));
+-    palette.setColor(QPalette::Disabled, QPalette::HighlightedText, QRgb(0x707070));
+-
+-    palette.setColor(QPalette::All, QPalette::Light, QRgb(0x414145));
+-    palette.setColor(QPalette::All, QPalette::Midlight, QRgb(0x39393C));
+-    palette.setColor(QPalette::All, QPalette::Mid, QRgb(0x2F2F32));
+-    palette.setColor(QPalette::All, QPalette::Dark, QRgb(0x202022));
+-    palette.setColor(QPalette::All, QPalette::Shadow, QRgb(0x19191A));
+-
+-    palette.setColor(QPalette::All, QPalette::Link, QRgb(0x68B668));
+-    palette.setColor(QPalette::Disabled, QPalette::Link, QRgb(0x74A474));
+-    palette.setColor(QPalette::All, QPalette::LinkVisited, QRgb(0x75B875));
+-    palette.setColor(QPalette::Disabled, QPalette::LinkVisited, QRgb(0x77A677));
+-
++    palette.setColor(QPalette::All, QPalette::Window, QColor("#111827"));
++    palette.setColor(QPalette::All, QPalette::WindowText, QColor("#edf2fa"));
++    palette.setColor(QPalette::All, QPalette::Text, QColor("#edf2fa"));
++    palette.setColor(QPalette::All, QPalette::PlaceholderText, QColor("#a4b2c8"));
++    palette.setColor(QPalette::All, QPalette::BrightText, QColor("#ffffff"));
++    palette.setColor(QPalette::All, QPalette::Base, QColor("#1a2436"));
++    palette.setColor(QPalette::All, QPalette::AlternateBase, QColor("#243149"));
++    palette.setColor(QPalette::All, QPalette::ToolTipBase, QColor("#24324a"));
++    palette.setColor(QPalette::All, QPalette::ToolTipText, QColor("#edf2fa"));
++    palette.setColor(QPalette::All, QPalette::Button, QColor("#24324a"));
++    palette.setColor(QPalette::All, QPalette::ButtonText, QColor("#edf2fa"));
++    palette.setColor(QPalette::All, QPalette::Highlight, QColor("#456fe8"));
++    palette.setColor(QPalette::All, QPalette::HighlightedText, QColor("#ffffff"));
++    palette.setColor(QPalette::All, QPalette::Light, QColor("#24324a"));
++    palette.setColor(QPalette::All, QPalette::Midlight, QColor("#2d3a50"));
++    palette.setColor(QPalette::All, QPalette::Mid, QColor("#40516b"));
++    palette.setColor(QPalette::All, QPalette::Dark, QColor("#526681"));
++    palette.setColor(QPalette::All, QPalette::Shadow, QColor("#0b1220"));
++    palette.setColor(QPalette::All, QPalette::Link, QColor("#a6c0ff"));
++    palette.setColor(QPalette::All, QPalette::LinkVisited, QColor("#c0c6ff"));
++    palette.setColor(QPalette::Disabled, QPalette::Text, QColor("#75839a"));
++    palette.setColor(QPalette::Disabled, QPalette::WindowText, QColor("#75839a"));
++    palette.setColor(QPalette::Disabled, QPalette::ButtonText, QColor("#75839a"));
++    palette.setColor(QPalette::Disabled, QPalette::PlaceholderText, QColor("#75839a"));
+     return palette;
+ }
+ 
+@@ -122,9 +88,9 @@ void DarkStyle::polish(QWidget* widget)
+             palette.setColor(QPalette::Disabled, QPalette::Window, QRgb(0x2D2D2D));
+         }
+ #else
+-        palette.setColor(QPalette::Active, QPalette::Window, QRgb(0x2F2F30));
+-        palette.setColor(QPalette::Inactive, QPalette::Window, QRgb(0x313133));
+-        palette.setColor(QPalette::Disabled, QPalette::Window, QRgb(0x3A3A3B));
++        palette.setColor(QPalette::Active, QPalette::Window, QRgb(0x111827));
++        palette.setColor(QPalette::Inactive, QPalette::Window, QRgb(0x111827));
++        palette.setColor(QPalette::Disabled, QPalette::Window, QRgb(0x1A2436));
+ #endif
+ 
+         widget->setPalette(palette);
+diff --git a/src/gui/styles/dark/darkstyle.qss b/src/gui/styles/dark/darkstyle.qss
+index e65efde..10f893a 100644
+--- a/src/gui/styles/dark/darkstyle.qss
++++ b/src/gui/styles/dark/darkstyle.qss
+@@ -1,13 +1,13 @@
+ DatabaseWidget:!active,
+ DatabaseWidget #groupView:!active, DatabaseWidget #tagView:!active,
+ EntryPreviewWidget *:!active[blendIn="true"] {
+-    background-color: #404042;
++    background-color: #111827;
+ }
+ 
+ DatabaseWidget:disabled,
+ DatabaseWidget #groupView:disabled, DatabaseWidget #tagView:disabled,
+ EntryPreviewWidget *:disabled[blendIn="true"] {
+-    background-color: #424242;
++    background-color: #1a2436;
+ }
+ 
+ QMenu {
+@@ -26,14 +26,16 @@ QPushButton:!default:hover {
+ 
+ QPushButton:default:hover, QPushButton:checked:hover {
+     /* Using slightly lighter shade from palette(highlight) */
+-    background: #2E582E;
++    background: #527bef;
+ }
+ 
+ QToolTip {
+-    color: #BFBFBF;
+-    background-color: #2D532D;
++    color: #edf2fa;
++    background-color: #24324a;
+ }
+ 
+ QGroupBox {
+     background-color: palette(light);
+ }
++
++WelcomeWidget #buttonNewDatabase:hover { background: #527bef; }
+diff --git a/src/gui/styles/light/LightStyle.cpp b/src/gui/styles/light/LightStyle.cpp
+index 8ef3986..7c207fb 100644
+--- a/src/gui/styles/light/LightStyle.cpp
++++ b/src/gui/styles/light/LightStyle.cpp
+@@ -39,64 +39,30 @@ LightStyle::LightStyle()
+ QPalette LightStyle::standardPalette() const
+ {
+     auto palette = BaseStyle::standardPalette();
+-    palette.setColor(QPalette::Active, QPalette::Window, QRgb(0xF7F7F7));
+-    palette.setColor(QPalette::Inactive, QPalette::Window, QRgb(0xFCFCFC));
+-    palette.setColor(QPalette::Disabled, QPalette::Window, QRgb(0xEDEDED));
+-
+-    palette.setColor(QPalette::Active, QPalette::WindowText, QRgb(0x1D1D20));
+-    palette.setColor(QPalette::Inactive, QPalette::WindowText, QRgb(0x252528));
+-    palette.setColor(QPalette::Disabled, QPalette::WindowText, QRgb(0x8C8C92));
+-
+-    palette.setColor(QPalette::Active, QPalette::Text, QRgb(0x1D1D20));
+-    palette.setColor(QPalette::Inactive, QPalette::Text, QRgb(0x252528));
+-    palette.setColor(QPalette::Disabled, QPalette::Text, QRgb(0x8C8C92));
+-
+-    palette.setColor(QPalette::Active, QPalette::PlaceholderText, QRgb(0x71727D));
+-    palette.setColor(QPalette::Inactive, QPalette::PlaceholderText, QRgb(0x878893));
+-    palette.setColor(QPalette::Disabled, QPalette::PlaceholderText, QRgb(0xA3A4AC));
+-
+-    palette.setColor(QPalette::Active, QPalette::BrightText, QRgb(0xF3F3F4));
+-    palette.setColor(QPalette::Inactive, QPalette::BrightText, QRgb(0xEAEAEB));
+-    palette.setColor(QPalette::Disabled, QPalette::BrightText, QRgb(0xE4E5E7));
+-
+-    palette.setColor(QPalette::Active, QPalette::Base, QRgb(0xF9F9F9));
+-    palette.setColor(QPalette::Inactive, QPalette::Base, QRgb(0xFCFCFC));
+-    palette.setColor(QPalette::Disabled, QPalette::Base, QRgb(0xEFEFF2));
+-
+-    palette.setColor(QPalette::Active, QPalette::AlternateBase, QRgb(0xECF3E8));
+-    palette.setColor(QPalette::Inactive, QPalette::AlternateBase, QRgb(0xF1F6EE));
+-    palette.setColor(QPalette::Disabled, QPalette::AlternateBase, QRgb(0xE1E9DD));
+-
+-    palette.setColor(QPalette::All, QPalette::ToolTipBase, QRgb(0x4D7F1A));
+-    palette.setColor(QPalette::All, QPalette::ToolTipText, QRgb(0xF9F9F9));
+-
+-    palette.setColor(QPalette::Active, QPalette::Button, QRgb(0xD4D5DD));
+-    palette.setColor(QPalette::Inactive, QPalette::Button, QRgb(0xDCDCE0));
+-    palette.setColor(QPalette::Disabled, QPalette::Button, QRgb(0xE5E5E6));
+-
+-    palette.setColor(QPalette::Active, QPalette::ButtonText, QRgb(0x181A18));
+-    palette.setColor(QPalette::Inactive, QPalette::ButtonText, QRgb(0x454A54));
+-    palette.setColor(QPalette::Disabled, QPalette::ButtonText, QRgb(0x97979B));
+-
+-    palette.setColor(QPalette::Active, QPalette::Highlight, QRgb(0x507F1F));
+-    palette.setColor(QPalette::Inactive, QPalette::Highlight, QRgb(0xA6BE8E));
+-    palette.setColor(QPalette::Disabled, QPalette::Highlight, QRgb(0xC3D5B4));
+-
+-    palette.setColor(QPalette::Active, QPalette::HighlightedText, QRgb(0xFFFFFF));
+-    palette.setColor(QPalette::Inactive, QPalette::HighlightedText, QRgb(0x252528));
+-    palette.setColor(QPalette::Disabled, QPalette::HighlightedText, QRgb(0x8C8C92));
+-
+-    palette.setColor(QPalette::All, QPalette::Light, QRgb(0xF9F9F9));
+-    palette.setColor(QPalette::All, QPalette::Midlight, QRgb(0xE9E9EB));
+-    palette.setColor(QPalette::All, QPalette::Mid, QRgb(0xC9C9CF));
+-    palette.setColor(QPalette::All, QPalette::Dark, QRgb(0xBBBBC2));
+-    palette.setColor(QPalette::All, QPalette::Shadow, QRgb(0x6C6D79));
+-
+-    palette.setColor(QPalette::All, QPalette::Link, QRgb(0x4B7B19));
+-    palette.setColor(QPalette::Disabled, QPalette::Link, QRgb(0x4F6935));
+-    palette.setColor(QPalette::All, QPalette::LinkVisited, QRgb(0x507826));
+-    palette.setColor(QPalette::Disabled, QPalette::LinkVisited, QRgb(0x506935));
+-
++    palette.setColor(QPalette::All, QPalette::Window, QColor("#f5f7fb"));
++    palette.setColor(QPalette::All, QPalette::WindowText, QColor("#172337"));
++    palette.setColor(QPalette::All, QPalette::Text, QColor("#172337"));
++    palette.setColor(QPalette::All, QPalette::PlaceholderText, QColor("#607087"));
++    palette.setColor(QPalette::All, QPalette::BrightText, QColor("#ffffff"));
++    palette.setColor(QPalette::All, QPalette::Base, QColor("#ffffff"));
++    palette.setColor(QPalette::All, QPalette::AlternateBase, QColor("#eaf1fc"));
++    palette.setColor(QPalette::All, QPalette::ToolTipBase, QColor("#172337"));
++    palette.setColor(QPalette::All, QPalette::ToolTipText, QColor("#ffffff"));
++    palette.setColor(QPalette::All, QPalette::Button, QColor("#f3f6fb"));
++    palette.setColor(QPalette::All, QPalette::ButtonText, QColor("#172337"));
++    palette.setColor(QPalette::All, QPalette::Highlight, QColor("#3564dc"));
++    palette.setColor(QPalette::All, QPalette::HighlightedText, QColor("#ffffff"));
++    palette.setColor(QPalette::All, QPalette::Light, QColor("#ffffff"));
++    palette.setColor(QPalette::All, QPalette::Midlight, QColor("#e1e7f0"));
++    palette.setColor(QPalette::All, QPalette::Mid, QColor("#ccd5e3"));
++    palette.setColor(QPalette::All, QPalette::Dark, QColor("#a7b2c3"));
++    palette.setColor(QPalette::All, QPalette::Shadow, QColor("#67748a"));
++    palette.setColor(QPalette::All, QPalette::Link, QColor("#2855c7"));
++    palette.setColor(QPalette::All, QPalette::LinkVisited, QColor("#435e9b"));
++    palette.setColor(QPalette::Disabled, QPalette::Text, QColor("#8b96a6"));
++    palette.setColor(QPalette::Disabled, QPalette::WindowText, QColor("#8b96a6"));
++    palette.setColor(QPalette::Disabled, QPalette::ButtonText, QColor("#8b96a6"));
++    palette.setColor(QPalette::Disabled, QPalette::PlaceholderText, QColor("#8b96a6"));
+     return palette;
+ }
+ 
+@@ -122,9 +88,9 @@ void LightStyle::polish(QWidget* widget)
+             palette.setColor(QPalette::Disabled, QPalette::Window, QRgb(0xF5F5F5));
+         }
+ #else
+-        palette.setColor(QPalette::Active, QPalette::Window, QRgb(0xEFF0F1));
+-        palette.setColor(QPalette::Inactive, QPalette::Window, QRgb(0xEFF0F1));
+-        palette.setColor(QPalette::Disabled, QPalette::Window, QRgb(0xE1E2E4));
++        palette.setColor(QPalette::Active, QPalette::Window, QRgb(0xF5F7FB));
++        palette.setColor(QPalette::Inactive, QPalette::Window, QRgb(0xF5F7FB));
++        palette.setColor(QPalette::Disabled, QPalette::Window, QRgb(0xEEF2F8));
+ #endif
+ 
+         widget->setPalette(palette);
+diff --git a/src/gui/styles/light/lightstyle.qss b/src/gui/styles/light/lightstyle.qss
+index 123267c..9f5c029 100644
+--- a/src/gui/styles/light/lightstyle.qss
++++ b/src/gui/styles/light/lightstyle.qss
+@@ -1,25 +1,27 @@
+ DatabaseWidget:!active,
+ DatabaseWidget #groupView:!active, DatabaseWidget #tagView:!active,
+ EntryPreviewWidget *:!active[blendIn="true"] {
+-    background-color: #FCFCFC;
++    background-color: #F5F7FB;
+ }
+ 
+ DatabaseWidget:disabled,
+ DatabaseWidget #groupView:disabled, DatabaseWidget #tagView:disabled,
+ EntryPreviewWidget *:disabled[blendIn="true"] {
+-    background-color: #EDEDED;
++    background-color: #EEF2F8;
+ }
+ 
+ QPushButton:default:hover, QPushButton:checked:hover {
+     /* Using slightly lighter shade from palette(highlight) */
+-    background: #568821;
++    background: #2855c7;
+ }
+ 
+ QToolTip {
+     color: #F9F9F9;
+-    background-color: #4D7F1A;
++    background-color: #172337;
+ }
+ 
+ QGroupBox::title {
+-    color: #4B7B19;
++    color: #2855c7;
+ }
++
++WelcomeWidget #buttonNewDatabase:hover { background: #2855c7; }
+diff --git a/src/gui/styles/styles.qrc b/src/gui/styles/styles.qrc
+index 9f4d7d7..f13176d 100644
+--- a/src/gui/styles/styles.qrc
++++ b/src/gui/styles/styles.qrc
+@@ -5,5 +5,6 @@
+         <file>base/basestyle.qss</file>
+         <file>dark/darkstyle.qss</file>
+         <file>light/lightstyle.qss</file>
++        <file>base/localvault.qss</file>
+     </qresource>
+ </RCC>
+diff --git a/tests/TestAutoType.cpp b/tests/TestAutoType.cpp
+index e87c404..a92feb3 100644
+--- a/tests/TestAutoType.cpp
++++ b/tests/TestAutoType.cpp
+@@ -153,9 +153,8 @@ void TestAutoType::testSingleAutoType()
+ {
+     m_autoType->performAutoType(m_entry1);
+ 
+-    QCOMPARE(m_test->actionCount(), 14);
+-    QCOMPARE(m_test->actionChars(),
+-             QString("myuser%1mypass%2").arg(m_test->keyToString(Qt::Key_Tab)).arg(m_test->keyToString(Qt::Key_Enter)));
++    QCOMPARE(m_test->actionCount(), 13);
++    QCOMPARE(m_test->actionChars(), QString("myuser%1mypass").arg(m_test->keyToString(Qt::Key_Tab)));
+ }
+ 
+ void TestAutoType::testGlobalAutoTypeWithNoMatch()
+@@ -184,7 +183,7 @@ void TestAutoType::testGlobalAutoTypeTitleMatch()
+     emit osUtils->globalShortcutTriggered("autotype");
+     m_autoType->performGlobalAutoType(m_dbList);
+ 
+-    QCOMPARE(m_test->actionChars(), QString("%1%2").arg(m_entry2->password(), m_test->keyToString(Qt::Key_Enter)));
++    QCOMPARE(m_test->actionChars(), m_entry2->password());
+ }
+ 
+ void TestAutoType::testGlobalAutoTypeUrlMatch()
+@@ -195,7 +194,7 @@ void TestAutoType::testGlobalAutoTypeUrlMatch()
+     emit osUtils->globalShortcutTriggered("autotype");
+     m_autoType->performGlobalAutoType(m_dbList);
+ 
+-    QCOMPARE(m_test->actionChars(), QString("%1%2").arg(m_entry5->password(), m_test->keyToString(Qt::Key_Enter)));
++    QCOMPARE(m_test->actionChars(), m_entry5->password());
+ }
+ 
+ void TestAutoType::testGlobalAutoTypeUrlSubdomainMatch()
+@@ -206,7 +205,7 @@ void TestAutoType::testGlobalAutoTypeUrlSubdomainMatch()
+     emit osUtils->globalShortcutTriggered("autotype");
+     m_autoType->performGlobalAutoType(m_dbList);
+ 
+-    QCOMPARE(m_test->actionChars(), QString("%1%2").arg(m_entry5->password(), m_test->keyToString(Qt::Key_Enter)));
++    QCOMPARE(m_test->actionChars(), m_entry5->password());
+ }
+ 
+ void TestAutoType::testGlobalAutoTypeTitleMatchDisabled()
+@@ -383,7 +382,7 @@ void TestAutoType::testAutoTypeSyntaxChecks()
+ 
+ void TestAutoType::testAutoTypeEffectiveSequences()
+ {
+-    QString defaultSequence("{USERNAME}{TAB}{PASSWORD}{ENTER}");
++    QString defaultSequence("{USERNAME}{TAB}{PASSWORD}");
+     QString sequenceG1("{TEST_GROUP1}");
+     QString sequenceG3("{TEST_GROUP3}");
+     QString sequenceE2("{TEST_ENTRY2}");
+diff --git a/tests/TestBrowser.cpp b/tests/TestBrowser.cpp
+index 15afa2b..cd77b74 100644
+--- a/tests/TestBrowser.cpp
++++ b/tests/TestBrowser.cpp
+@@ -60,6 +60,7 @@ void TestBrowser::init()
+ 
+ void TestBrowser::testChangePublicKeys()
+ {
++    QCOMPARE(browserMessageBuilder()->buildMessage(NONCE)["version"].toString(), QStringLiteral("2.8.0"));
+     QJsonObject json;
+     json["action"] = "change-public-keys";
+     json["publicKey"] = PUBLICKEY;
+diff --git a/tests/TestEntry.cpp b/tests/TestEntry.cpp
+index 414607d..9d144c0 100644
+--- a/tests/TestEntry.cpp
++++ b/tests/TestEntry.cpp
+@@ -20,6 +20,9 @@
+ 
+ #include "TestEntry.h"
+ #include "core/Clock.h"
++#include "core/Config.h"
++#include "core/Database.h"
++#include "core/QuickSave.h"
+ #include "core/Group.h"
+ #include "core/Metadata.h"
+ #include "core/TimeInfo.h"
+@@ -33,6 +36,43 @@ void TestEntry::initTestCase()
+     QLocale::setDefault(QLocale::c());
+ }
+ 
++void TestEntry::testQuickSaveAssociation()
++{
++    const QString window = QStringLiteral("登录 *? [账户] - Example.exe");
++    Entry entry;
++    QuickSave::prepareEntry(&entry, window);
++    QCOMPARE(entry.title(), window);
++    QCOMPARE(entry.defaultAutoTypeSequence(), QStringLiteral("{USERNAME}{TAB}{PASSWORD}"));
++    QCOMPARE(entry.autoTypeAssociations()->size(), 1);
++    const auto pattern = entry.autoTypeAssociations()->get(0).window;
++    QRegularExpression regex(pattern.mid(2, pattern.size() - 4));
++    QVERIFY(regex.isValid());
++    QVERIFY(regex.match(window).hasMatch());
++    QVERIFY(!regex.match(QStringLiteral("登录 anything [账户] - Example.exe")).hasMatch());
++    QVERIFY(!regex.match(window + QStringLiteral(" - other")).hasMatch());
++    Entry empty;
++    QuickSave::prepareEntry(&empty, {});
++    QCOMPARE(empty.autoTypeAssociations()->size(), 0);
++}
++
++void TestEntry::testDefaultAutoTypeDoesNotSubmit()
++{
++    Database db;
++    auto entry = new Entry();
++    entry->setGroup(db.rootGroup());
++    entry->setUsername("test-user");
++    entry->setPassword("fictional-password");
++    QCOMPARE(entry->effectiveAutoTypeSequence(), QStringLiteral("{USERNAME}{TAB}{PASSWORD}"));
++    entry->setUsername({});
++    QCOMPARE(entry->effectiveAutoTypeSequence(), QStringLiteral("{PASSWORD}"));
++    entry->setUsername("test-user");
++    entry->setPassword({});
++    QCOMPARE(entry->effectiveAutoTypeSequence(), QStringLiteral("{USERNAME}"));
++    // An explicit existing user sequence remains compatible with old databases.
++    entry->setDefaultAutoTypeSequence("{USERNAME}{ENTER}");
++    QCOMPARE(entry->effectiveAutoTypeSequence(), QStringLiteral("{USERNAME}{ENTER}"));
++}
++
+ void TestEntry::testHistoryItemDeletion()
+ {
+     QScopedPointer<Entry> entry(new Entry());
+diff --git a/tests/TestEntry.h b/tests/TestEntry.h
+index c745122..61d1f95 100644
+--- a/tests/TestEntry.h
++++ b/tests/TestEntry.h
+@@ -46,6 +46,8 @@ private slots:
+     void testMoveUpDown();
+     void testPreviousParentGroup();
+     void testContainsPlaceholder();
++    void testQuickSaveAssociation();
++    void testDefaultAutoTypeDoesNotSubmit();
+ };
+ 
+ #endif // KEEPASSX_TESTENTRY_H
+diff --git a/tests/gui/CMakeLists.txt b/tests/gui/CMakeLists.txt
+index a549a87..2f5475d 100644
+--- a/tests/gui/CMakeLists.txt
++++ b/tests/gui/CMakeLists.txt
+@@ -17,6 +17,7 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/..)
+ 
+ add_unit_test(NAME testgui SOURCES TestGui.cpp ../util/TemporaryFile.cpp ../mock/MockRemoteProcess.cpp LIBS ${TEST_LIBRARIES})
+ add_unit_test(NAME testguipixmaps SOURCES TestGuiPixmaps.cpp LIBS ${TEST_LIBRARIES})
++add_unit_test(NAME testlocalvaultappearance SOURCES TestLocalVaultAppearance.cpp ../util/TemporaryFile.cpp LIBS ${TEST_LIBRARIES})
+ 
+ file(GLOB_RECURSE ATTACHMENTS_TEST_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/attachments/*.cpp)
+ add_unit_test(NAME testguiattachments SOURCES ${ATTACHMENTS_TEST_SOURCES} LIBS ${TEST_LIBRARIES})
+diff --git a/tests/gui/TestGui.cpp b/tests/gui/TestGui.cpp
+index f1258c5..b2ba14d 100644
+--- a/tests/gui/TestGui.cpp
++++ b/tests/gui/TestGui.cpp
+@@ -816,6 +816,37 @@ void TestGui::testSearchEditEntry()
+              QStringLiteral("Good \u2022 Doggy \u2022 Edit entry"));
+ }
+ 
++void TestGui::testQuickSaveConfirmAndCancel()
++{
++    auto group = m_dbWidget->currentGroup();
++    QVERIFY(group);
++    const auto count = group->entries().size();
++    const auto title = QStringLiteral("LocalVault Test Login");
++    m_dbWidget->createEntryForWindow(title);
++    QCOMPARE(m_dbWidget->currentMode(), DatabaseWidget::Mode::EditEntryMode);
++    auto editor = m_dbWidget->findChild<EditEntryWidget*>("editEntryWidget");
++    QVERIFY(editor);
++    auto titleEdit = editor->findChild<QLineEdit*>("titleEdit");
++    QCOMPARE(titleEdit->text(), title);
++    auto buttons = editor->findChild<QDialogButtonBox*>("buttonBox");
++    QVERIFY(buttons);
++    QCOMPARE(group->entries().size(), count);
++    MessageBox::setNextAnswer(MessageBox::Discard);
++    QTest::mouseClick(buttons->button(QDialogButtonBox::Cancel), Qt::LeftButton);
++    QTRY_COMPARE(m_dbWidget->currentMode(), DatabaseWidget::Mode::ViewMode);
++    QCOMPARE(group->entries().size(), count);
++    m_dbWidget->createEntryForWindow(title);
++    QTest::mouseClick(buttons->button(QDialogButtonBox::Ok), Qt::LeftButton);
++    QTRY_COMPARE(group->entries().size(), count + 1);
++    auto entry = m_dbWidget->currentSelectedEntry();
++    QVERIFY(entry);
++    QCOMPARE(entry->title(), title);
++    QCOMPARE(entry->autoTypeAssociations()->size(), 1);
++    // The editor normalizes a sequence equal to the group default to inheritance.
++    QCOMPARE(entry->effectiveAutoTypeSequence(), QStringLiteral("{USERNAME}{TAB}{PASSWORD}"));
++    QCOMPARE(entry->autoTypeAssociations()->get(0).sequence, QStringLiteral("{USERNAME}{TAB}{PASSWORD}"));
++}
++
+ void TestGui::testAddEntry()
+ {
+     auto* toolBar = m_mainWindow->findChild<QToolBar*>("toolBar");
+diff --git a/tests/gui/TestGui.h b/tests/gui/TestGui.h
+index 8a90f07..467ae4a 100644
+--- a/tests/gui/TestGui.h
++++ b/tests/gui/TestGui.h
+@@ -48,6 +48,7 @@ private slots:
+     void testEditEntry();
+     void testSearchEditEntry();
+     void testAddEntry();
++    void testQuickSaveConfirmAndCancel();
+     void testPasswordEntryEntropy();
+     void testPasswordEntryEntropy_data();
+     void testDicewareEntryEntropy();
+diff --git a/src/core/QuickSave.h b/src/core/QuickSave.h
+new file mode 100644
+index 0000000..8f245ae
+--- /dev/null
++++ b/src/core/QuickSave.h
+@@ -0,0 +1,22 @@
++// SPDX-License-Identifier: GPL-2.0-or-later
++#ifndef LOCALVAULT_QUICKSAVE_H
++#define LOCALVAULT_QUICKSAVE_H
++
++#include "core/Entry.h"
++#include <QRegularExpression>
++
++namespace QuickSave
++{
++    // Literal, anchored association: '*' and '?' in a window title are not wildcards.
++    inline void prepareEntry(Entry* entry, const QString& windowTitle)
++    {
++        entry->setTitle(windowTitle);
++        entry->setDefaultAutoTypeSequence(QStringLiteral("{USERNAME}{TAB}{PASSWORD}"));
++        if (!windowTitle.isEmpty()) {
++            entry->autoTypeAssociations()->add(
++                {QStringLiteral("//\\A") + QRegularExpression::escape(windowTitle) + QStringLiteral("\\z//"),
++                 QStringLiteral("{USERNAME}{TAB}{PASSWORD}")});
++        }
++    }
++}
++#endif
+diff --git a/src/gui/QuickSaveController.h b/src/gui/QuickSaveController.h
+new file mode 100644
+index 0000000..82c1509
+--- /dev/null
++++ b/src/gui/QuickSaveController.h
+@@ -0,0 +1,134 @@
++// SPDX-License-Identifier: GPL-2.0-or-later
++#ifndef LOCALVAULT_QUICKSAVECONTROLLER_H
++#define LOCALVAULT_QUICKSAVECONTROLLER_H
++
++#ifdef Q_OS_WIN
++#include "core/Config.h"
++#include <QAbstractNativeEventFilter>
++#include <QApplication>
++#include <QDialog>
++#include <QDialogButtonBox>
++#include <QKeySequenceEdit>
++#include <QLabel>
++#include <QMenu>
++#include <QMessageBox>
++#include <QTimer>
++#include <QVBoxLayout>
++#include <functional>
++#include <qt_windows.h>
++
++/** Only observes its registered hotkey; never hooks the keyboard or reads form values. */
++class QuickSaveController : public QObject, public QAbstractNativeEventFilter
++{
++public:
++    QuickSaveController(QWidget* owner, QMenu* menu, std::function<void(const QString&)> callback)
++        : QObject(owner), m_owner(owner), m_window(reinterpret_cast<HWND>(owner->winId())),
++          m_callback(std::move(callback))
++    {
++        qApp->installNativeEventFilter(this);
++        const auto shortcut = config()->get(Config::QuickSaveShortcut).toString();
++        if (!shortcut.isEmpty() && !registerShortcut(QKeySequence::fromString(shortcut, QKeySequence::PortableText))) {
++            QTimer::singleShot(0, this, [this] {
++                QMessageBox::warning(m_owner, QStringLiteral("快捷保存"),
++                    QStringLiteral("快捷保存热键无法注册，可能已被占用。请在“工具 → 快捷保存热键”中重新设置。"));
++            });
++        }
++        menu->addSeparator();
++        auto action = menu->addAction(QStringLiteral("快捷保存热键…"));
++        connect(action, &QAction::triggered, this, [this] { configure(); });
++    }
++
++    ~QuickSaveController() override
++    {
++        if (m_registered) UnregisterHotKey(m_window, m_hotkeyId);
++        qApp->removeNativeEventFilter(this);
++    }
++
++    bool nativeEventFilter(const QByteArray&, void* message, qintptr* result) override
++    {
++        const auto msg = static_cast<MSG*>(message);
++        if (!m_registered || msg->hwnd != m_window || msg->message != WM_HOTKEY
++            || int(msg->wParam) != m_hotkeyId) return false;
++        const auto target = GetForegroundWindow();
++        DWORD processId = 0;
++        GetWindowThreadProcessId(target, &processId);
++        if (target && processId != GetCurrentProcessId() && !QApplication::activeModalWidget()) {
++            wchar_t title[4096] = {};
++            const auto length = GetWindowTextW(target, title, 4096);
++            const auto windowTitle = QString::fromWCharArray(title, length);
++            QTimer::singleShot(0, this, [this, windowTitle] { m_callback(windowTitle); });
++        }
++        *result = 0;
++        return true;
++    }
++
++private:
++    bool registerShortcut(const QKeySequence& sequence)
++    {
++        if (sequence.count() != 1) return false;
++        const auto combination = sequence[0];
++        const auto key = combination.key();
++        const auto modifiers = combination.keyboardModifiers();
++        UINT nativeModifiers = MOD_NOREPEAT;
++        if (modifiers & Qt::ControlModifier) nativeModifiers |= MOD_CONTROL;
++        if (modifiers & Qt::AltModifier) nativeModifiers |= MOD_ALT;
++        if (modifiers & Qt::ShiftModifier) nativeModifiers |= MOD_SHIFT;
++        if (modifiers & Qt::MetaModifier) nativeModifiers |= MOD_WIN;
++        if (!(nativeModifiers & (MOD_CONTROL | MOD_ALT | MOD_WIN))) return false;
++        UINT nativeKey = 0;
++        if ((key >= Qt::Key_A && key <= Qt::Key_Z) || (key >= Qt::Key_0 && key <= Qt::Key_9)) {
++            nativeKey = UINT(key);
++        } else if (key >= Qt::Key_F1 && key <= Qt::Key_F24) {
++            nativeKey = VK_F1 + UINT(key - Qt::Key_F1);
++        } else {
++            return false;
++        }
++        if (m_registered && sequence == m_sequence) return true;
++        const auto newId = m_hotkeyId == 0x4C56 ? 0x4C57 : 0x4C56;
++        // Register first, so an invalid or occupied replacement retains the old binding.
++        if (!RegisterHotKey(m_window, newId, nativeModifiers, nativeKey)) return false;
++        if (m_registered) UnregisterHotKey(m_window, m_hotkeyId);
++        m_hotkeyId = newId;
++        m_registered = true;
++        m_sequence = sequence;
++        return true;
++    }
++
++    void configure()
++    {
++        QDialog dialog(m_owner);
++        dialog.setWindowTitle(QStringLiteral("快捷保存热键"));
++        auto layout = new QVBoxLayout(&dialog);
++        layout->addWidget(new QLabel(QStringLiteral("在其他软件中按此热键，录入并关联账号。\n"
++            "使用 Ctrl、Alt 或 Win 加字母、数字或 F1–F24；清空可禁用。"), &dialog));
++        auto editor = new QKeySequenceEdit(QKeySequence::fromString(
++            config()->get(Config::QuickSaveShortcut).toString(), QKeySequence::PortableText), &dialog);
++        layout->addWidget(editor);
++        auto buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dialog);
++        layout->addWidget(buttons);
++        connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
++        connect(buttons, &QDialogButtonBox::accepted, &dialog, [this, editor, &dialog] {
++            const auto sequence = editor->keySequence();
++            if (sequence.isEmpty()) {
++                if (m_registered) UnregisterHotKey(m_window, m_hotkeyId);
++                m_registered = false;
++            } else if (!registerShortcut(sequence)) {
++                QMessageBox::warning(&dialog, QStringLiteral("无法使用此热键"),
++                    QStringLiteral("热键已被占用或格式不支持，请重新选择。原热键保持有效。"));
++                return;
++            }
++            config()->set(Config::QuickSaveShortcut, sequence.toString(QKeySequence::PortableText));
++            dialog.accept();
++        });
++        dialog.exec();
++    }
++
++    QWidget* m_owner;
++    HWND m_window;
++    std::function<void(const QString&)> m_callback;
++    QKeySequence m_sequence;
++    int m_hotkeyId = 0x4C56;
++    bool m_registered = false;
++};
++#endif
++#endif
+diff --git a/src/gui/styles/base/localvault.qss b/src/gui/styles/base/localvault.qss
+new file mode 100644
+index 0000000..c508fa9
+--- /dev/null
++++ b/src/gui/styles/base/localvault.qss
+@@ -0,0 +1,54 @@
++/* SPDX-License-Identifier: GPL-2.0-or-later
++ * Palette roles keep the same layout readable in both system-selected themes.
++ */
++QMenuBar { padding: 4px 8px; background: palette(window); }
++QMenuBar::item { padding: 5px 9px; border-radius: 5px; }
++QMenuBar::item:selected { background: palette(midlight); }
++QMenu { padding: 5px; }
++QMenu::item { padding: 7px 22px; border-radius: 5px; }
++QToolBar#toolBar { border: none; border-bottom: 1px solid palette(midlight); padding: 7px; spacing: 3px; background: palette(window); }
++QToolBar#toolBar QToolButton { padding: 5px; border-radius: 7px; }
++QToolBar#toolBar QToolButton:hover { background: palette(midlight); }
++QToolBar#toolBar QToolButton::menu-button { border: none; width: 12px; }
++QToolBar#toolBar QToolButton#entryCreateButton { background: palette(alternate-base); border: 1px solid palette(mid); border-radius: 16px; padding: 5px 12px; }
++QToolBar#toolBar QToolButton#entryCreateButton:hover { background: palette(midlight); }
++QLineEdit#searchEdit { background: palette(alternate-base); border: 1px solid palette(midlight); border-radius: 17px; padding: 7px 12px; min-height: 20px; }
++QLineEdit#searchEdit:focus { border: 1px solid palette(highlight); }
++QStatusBar { background: palette(window); border-top: 1px solid palette(midlight); padding: 3px 8px; }
++DatabaseWidget #groupView, DatabaseWidget #tagView { background: palette(window); border: none; }
++DatabaseWidget #entryView { background: palette(base); border: none; }
++DatabaseWidget QTreeView::item { padding: 6px 8px; }
++DatabaseWidget QTreeView::item:hover { background: palette(midlight); }
++DatabaseWidget QTreeView::item:selected { background: palette(highlight); color: palette(highlighted-text); }
++QHeaderView::section { padding: 9px 10px; background: palette(window); border: none; border-bottom: 1px solid palette(midlight); font-weight: 600; }
++QTabBar::tab { padding: 8px 14px; }
++QGroupBox::title { color: palette(link); }
++WelcomeWidget { background: transparent; }
++QScrollArea#welcomeScrollArea, QWidget#welcomeContent { background: palette(window); border: none; }
++WelcomeWidget QLabel { background: transparent; }
++WelcomeWidget #iconLabel { color: #ffffff; background: #3564dc; border-radius: 15px; font-size: 20px; font-weight: 700; }
++WelcomeWidget #brandLabel { font-family: "Segoe UI"; font-size: 22px; font-weight: 700; color: palette(window-text); }
++WelcomeWidget #brandDescription, WelcomeWidget #descriptionLabel,
++WelcomeWidget #shortcutDescription, WelcomeWidget #startLabel,
++WelcomeWidget #footerLabel { color: palette(placeholder-text); }
++WelcomeWidget #brandDescription, WelcomeWidget #footerLabel { font-size: 12px; }
++WelcomeWidget #welcomeCard { background: palette(base); border: 1px solid palette(midlight); border-radius: 16px; }
++WelcomeWidget #introPanel { background: palette(alternate-base); border: 1px solid palette(midlight); border-radius: 24px; }
++WelcomeWidget #welcomeLabel { font-size: 32px; font-weight: 700; color: palette(window-text); }
++WelcomeWidget #descriptionLabel { font-size: 14px; }
++WelcomeWidget QPushButton { padding: 6px 16px; font-size: 14px; border-radius: 21px; }
++WelcomeWidget #buttonNewDatabase { background: palette(highlight); color: palette(highlighted-text); border: 1px solid palette(highlight); font-weight: 600; }
++WelcomeWidget #buttonOpenDatabase { background: palette(window); color: palette(window-text); border: 1px solid palette(mid); font-weight: 600; }
++WelcomeWidget #buttonOpenDatabase:hover { background: palette(midlight); }
++WelcomeWidget #buttonImport { border: none; background: transparent; color: palette(link); padding: 4px 10px; font-size: 12px; }
++WelcomeWidget #buttonImport:hover { background: palette(window); }
++WelcomeWidget #shortcutCard { background: palette(base); border: 1px solid palette(midlight); border-radius: 12px; }
++WelcomeWidget #saveShortcutTitle, WelcomeWidget #fillShortcutTitle { color: palette(placeholder-text); font-size: 12px; }
++WelcomeWidget #saveShortcutKey, WelcomeWidget #fillShortcutKey { font-size: 16px; font-weight: 600; color: palette(window-text); }
++WelcomeWidget #recentLabel { color: palette(window-text); font-size: 13px; font-weight: 600; padding-top: 2px; }
++WelcomeWidget #startLabel { padding: 6px 0; }
++WelcomeWidget #recentListWidget { background: palette(base); border: 1px solid palette(midlight); border-radius: 10px; outline: none; }
++WelcomeWidget #recentListWidget::item { padding: 5px 12px; border-radius: 6px; }
++WelcomeWidget #recentListWidget::item:hover { background: palette(midlight); }
++WelcomeWidget #recentListWidget::item:selected { background: palette(highlight); color: palette(highlighted-text); }
++WelcomeWidget QPushButton:focus, WelcomeWidget #recentListWidget:focus { border: 2px solid palette(highlight); }
+diff --git a/tests/gui/TestLocalVaultAppearance.cpp b/tests/gui/TestLocalVaultAppearance.cpp
+new file mode 100644
+index 0000000..936962f
+--- /dev/null
++++ b/tests/gui/TestLocalVaultAppearance.cpp
+@@ -0,0 +1,187 @@
++// SPDX-License-Identifier: GPL-2.0-or-later
++// Uses a private config and synthetic in-memory entries; never reads personal vaults.
++#include "gui/Application.h"
++#include "config-keepassx.h"
++#include "gui/MainWindow.h"
++#include "gui/WelcomeWidget.h"
++#include "gui/DatabaseTabWidget.h"
++#include "gui/entry/EntryView.h"
++#include "core/Config.h"
++#include "core/Database.h"
++#include "core/Group.h"
++#include "core/Metadata.h"
++#include "crypto/Crypto.h"
++#include "util/TemporaryFile.h"
++#include "keys/CompositeKey.h"
++#include "keys/PasswordKey.h"
++
++#include <QDir>
++#include <QLabel>
++#include <QLineEdit>
++#include <QListWidget>
++#include <QPushButton>
++#include <QSignalSpy>
++#include <QTest>
++#include <QToolBar>
++#include <QTranslator>
++
++class TestLocalVaultAppearance : public QObject
++{
++    Q_OBJECT
++private slots:
++    void initTestCase()
++    {
++        QVERIFY(Crypto::init());
++        Config::createConfigFromFile(TemporaryFile::createTempConfigFile(), {});
++        config()->set(Config::QuickSaveShortcut, QString());
++        config()->set(Config::GlobalAutoTypeKey, 0);
++        config()->set(Config::UpdateCheckMessageShown, true);
++        config()->set(Config::AutoSaveAfterEveryChange, false);
++        config()->set(Config::AutoSaveOnExit, false);
++        config()->set(Config::RememberLastDatabases, false);
++        config()->set(Config::Messages_HidePreReleaseWarning, KEEPASSXC_VERSION);
++        Application::bootstrap("zh_CN");
++        const auto translations = qEnvironmentVariable("LOCALVAULT_TRANSLATIONS_DIR");
++        if (!translations.isEmpty()) {
++            QVERIFY(m_translator.load("keepassxc_zh_CN", translations));
++            qApp->installTranslator(&m_translator);
++        }
++    }
++
++    void welcomeActionsAndRecentPaths()
++    {
++        const QString file = QDir::tempPath() + "/localvault-preview/Personal.kdbx";
++        config()->set(Config::LastDatabases, QStringList{file});
++        WelcomeWidget welcome;
++        welcome.show();
++        welcome.activateWindow();
++        QSignalSpy createSpy(&welcome, &WelcomeWidget::newDatabase);
++        QSignalSpy openSpy(&welcome, &WelcomeWidget::openDatabase);
++        QSignalSpy importSpy(&welcome, &WelcomeWidget::importFile);
++        QSignalSpy recentSpy(&welcome, &WelcomeWidget::openDatabaseFile);
++        QTest::mouseClick(welcome.findChild<QPushButton*>("buttonNewDatabase"), Qt::LeftButton);
++        QTest::mouseClick(welcome.findChild<QPushButton*>("buttonOpenDatabase"), Qt::LeftButton);
++        QTest::mouseClick(welcome.findChild<QPushButton*>("buttonImport"), Qt::LeftButton);
++        QCOMPARE(createSpy.count(), 1);
++        QCOMPARE(openSpy.count(), 1);
++        QCOMPARE(importSpy.count(), 1);
++        auto recent = welcome.findChild<QListWidget*>("recentListWidget");
++        QCOMPARE(recent->count(), 1);
++        QVERIFY(!recent->item(0)->text().contains(QDir::tempPath()));
++        recent->setCurrentRow(0);
++        recent->setFocus();
++        QTRY_VERIFY(recent->hasFocus());
++        QTest::keyClick(recent, Qt::Key_Return);
++        QVERIFY(!recentSpy.isEmpty());
++        QCOMPARE(recentSpy.first().first().toString(), file);
++        config()->set(Config::RememberLastDatabases, true);
++        QTest::keyClick(recent, Qt::Key_Delete);
++        QCOMPARE(config()->get(Config::LastDatabases).toStringList().size(), 0);
++    }
++
++    void previews_data()
++    {
++        QTest::addColumn<QString>("theme");
++        QTest::newRow("light") << QStringLiteral("light");
++        QTest::newRow("dark") << QStringLiteral("dark");
++    }
++
++    void previews()
++    {
++        QFETCH(QString, theme);
++        config()->set(Config::GUI_ApplicationTheme, theme);
++        config()->set(Config::LastDatabases, QStringList{});
++        config()->set(Config::GUI_MainWindowGeometry, QByteArray());
++        qobject_cast<Application*>(qApp)->applyTheme();
++        if (!m_window) {
++            m_window = std::make_unique<MainWindow>();
++        }
++        auto& window = *m_window;
++        window.setAllowScreenCapture(true);
++        window.show();
++        window.resize(1120, 780);
++        QTest::qWait(80);
++        auto welcome = window.findChild<WelcomeWidget*>("welcomeWidget");
++        QVERIFY(welcome->isVisible());
++        QVERIFY(!window.findChild<QToolBar*>("toolBar")->isVisible());
++        const auto output = qEnvironmentVariable("LOCALVAULT_PREVIEW_DIR");
++        if (!output.isEmpty()) {
++            QVERIFY(QDir().mkpath(output));
++            QVERIFY(window.grab().save(output + "/welcome-" + theme + ".png"));
++            window.resize(800, 560);
++            QTest::qWait(40);
++            const auto create = welcome->findChild<QPushButton*>("buttonNewDatabase");
++            const auto import = welcome->findChild<QPushButton*>("buttonImport");
++            QVERIFY(import->geometry().top() >= create->mapTo(import->parentWidget(), QPoint(0, create->height())).y());
++            QVERIFY(window.grab().save(output + "/welcome-" + theme + "-compact.png"));
++            window.resize(1120, 780);
++        }
++        const auto palette = qApp->palette();
++        if (theme == "dark") {
++            QVERIFY(palette.color(QPalette::Window).lightness() < 80);
++            QVERIFY(palette.color(QPalette::Text).lightness() > 180);
++        } else {
++            QVERIFY(palette.color(QPalette::Window).lightness() > 220);
++            QVERIFY(palette.color(QPalette::Text).lightness() < 80);
++        }
++
++        auto db = QSharedPointer<Database>::create();
++        auto key = QSharedPointer<CompositeKey>::create();
++        key->addKey(QSharedPointer<PasswordKey>::create("SYNTHETIC-PREVIEW-ONLY"));
++        QVERIFY(db->setKey(key, false, false, false));
++        db->metadata()->setName("LocalVault Demo");
++        db->rootGroup()->setName(QStringLiteral("我的账号"));
++        auto web = new Group();
++        web->setName(QStringLiteral("网站账号"));
++        web->setParent(db->rootGroup());
++        auto apps = new Group();
++        apps->setName(QStringLiteral("软件账号"));
++        apps->setParent(db->rootGroup());
++        for (const auto& name : {"GitHub", "Microsoft", "Figma", "Notion", "Steam"}) {
++            auto entry = new Entry();
++            entry->setUuid(QUuid::createUuid());
++            entry->setTitle(QString::fromUtf8(name));
++            entry->setUsername("demo@example.invalid");
++            entry->setPassword("SYNTHETIC-PREVIEW-ONLY");
++            entry->setGroup(db->rootGroup());
++        }
++        db->markAsClean();
++        auto tabs = window.findChild<DatabaseTabWidget*>("tabWidget");
++        auto dbWidget = new DatabaseWidget(db, &window);
++        tabs->addDatabaseTab(dbWidget);
++        dbWidget->setSplitterSizes({{Config::GUI_SplitterState, {240, 850}},
++                                   {Config::GUI_GroupSplitterState, {420, 160}}});
++        QVERIFY(!dbWidget->isLocked());
++        QTest::qWait(80);
++        QVERIFY(window.findChild<QToolBar*>("toolBar")->isVisible());
++        QVERIFY(QMetaObject::invokeMethod(dbWidget->findChild<EntryView*>("entryView"), "fitColumnsToWindow"));
++        if (!output.isEmpty()) {
++            QVERIFY(window.grab().save(output + "/vault-" + theme + ".png"));
++        }
++        auto search = window.findChild<QLineEdit*>("searchEdit");
++        QVERIFY(search);
++        search->setFocus();
++        QTest::keyClicks(search, "GitHub");
++        auto entries = dbWidget->findChild<EntryView*>("entryView");
++        QTRY_COMPARE(entries->model()->rowCount(), 1);
++        search->clear();
++        QTRY_COMPARE(entries->model()->rowCount(), 5);
++        db->markAsClean();
++        QVERIFY(tabs->closeDatabaseTab(0));
++    }
++
++private:
++    QTranslator m_translator;
++    std::unique_ptr<MainWindow> m_window;
++};
++
++int main(int argc, char** argv)
++{
++    Application app(argc, argv);
++    app.setApplicationName("LocalVaultPreviewTest");
++    app.setQuitOnLastWindowClosed(false);
++    TestLocalVaultAppearance test;
++    return QTest::qExec(&test, argc, argv);
++}
++
++#include "TestLocalVaultAppearance.moc"
