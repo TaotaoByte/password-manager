@@ -2,9 +2,19 @@
 
 在 Windows、Android 和浏览器里管理网站与软件账号。LocalVault 使用标准 KDBX 4 加密文件，文件存放和同步由你决定。项目复用 KeePassXC、KeePassDX 和 KeePassXC-Browser，提供中文使用说明以及适合各平台的界面。
 
-[下载 Windows 便携包、Android 测试版与 Chromium 扩展](https://github.com/TaotaoByte/password-manager/releases/latest) · [从这里开始](00-先看这里.md) · [兼容性与验收](docs/COMPATIBILITY.md)
+[下载新版 Android 界面预览 APK](https://github.com/TaotaoByte/password-manager/releases/tag/v0.3.0-android) · [Windows 便携包与 Chromium 扩展](https://github.com/TaotaoByte/password-manager/releases/latest) · [从这里开始](00-先看这里.md) · [兼容性与验收](docs/COMPATIBILITY.md)
 
 ## 界面预览
+
+Android 是优先维护的客户端。账号页使用统一的标题、账号名、分组和导航字号，支持浅色及深色。底部玻璃栏可搜索、打开库菜单或锁定。
+
+| Android 浅色 | Android 深色 |
+| --- | --- |
+| <img src="docs/images/android-light.png" alt="Android 浅色账号列表" width="280"> | <img src="docs/images/android-dark.png" alt="Android 深色账号列表" width="280"> |
+
+玻璃栏只对界面装饰背景取样。Android 13 及以上通过原生着色器绘制模糊和弧边折射，Android 12 使用原生模糊，Android 11 使用半透明底色。所有版本都使用独立的文字和图标层。设计参考 Apple 的材质指南和 Google 的 Material 3 排版。
+
+[Apple 材质指南](https://developer.apple.com/design/human-interface-guidelines/materials) · [Material 3 排版](https://m3.material.io/styles/typography/overview)
 
 Windows 首页把创建、打开和导入放在右侧，左侧显示密码库介绍。账号列表支持搜索与分组，默认使用 Windows 的应用颜色模式。
 
@@ -12,19 +22,13 @@ Windows 首页把创建、打开和导入放在右侧，左侧显示密码库介
 
 ![Windows 深色账号列表](docs/images/windows-dark.png)
 
-Android 的浮动玻璃栏提供搜索、库菜单与锁定。浅色与深色有各自的渐变和描边，按钮下方保留系统手势区。
-
-| Android 浅色 | Android 深色 |
-| --- | --- |
-| <img src="docs/images/android-light.png" alt="Android 浅色账号列表" width="280"> | <img src="docs/images/android-dark.png" alt="Android 深色账号列表" width="280"> |
-
 Chromium 扩展的弹窗和设置页使用相同的配色与圆角。扩展内的颜色偏好仍可手动选择。
 
 ![Chromium 扩展弹窗](docs/images/browser-popup.png)
 
 ![Chromium 扩展设置](docs/images/browser-settings.png)
 
-截图由 Windows 测试程序、Android 14 模拟器与独立 Chromium 配置生成，显示的账号与密码库均为虚构数据。
+截图由 Windows 测试程序、Android 14 模拟器与独立 Chromium 配置生成，显示的账号与密码库均为虚构数据。Android 截图底部的“截屏模式”提示来自演示设置，默认安装不会开启。
 
 ## 安装
 

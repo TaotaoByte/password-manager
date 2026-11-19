@@ -211,7 +211,7 @@ index 73adab4..6e255bc 100644
                              //Important to set the color filter in separate thread,
                              //by adding it to the message queue
 diff --git a/app/src/main/res/layout/activity_file_selection.xml b/app/src/main/res/layout/activity_file_selection.xml
-index c804268..a864046 100644
+index c804268..c8b5d47 100644
 --- a/app/src/main/res/layout/activity_file_selection.xml
 +++ b/app/src/main/res/layout/activity_file_selection.xml
 @@ -43,8 +43,7 @@
@@ -224,7 +224,7 @@ index c804268..a864046 100644
              app:layout_constraintTop_toBottomOf="@+id/special_mode_view"
              app:layout_constraintBottom_toTopOf="@+id/file_selection_buttons_container">
  
-@@ -64,57 +63,36 @@
+@@ -64,57 +63,37 @@
                          android:layout_width="match_parent"
                          android:layout_height="wrap_content"
                          app:layout_collapseMode="parallax"
@@ -243,8 +243,7 @@ index c804268..a864046 100644
                              android:layout_width="wrap_content"
                              android:layout_height="wrap_content"
 -                            android:textSize="32sp"
-+                            android:textSize="38sp"
-                             android:textStyle="bold"
+-                            android:textStyle="bold"
 -                            android:shadowColor="#AD000000"
 -                            android:shadowDx="0"
 -                            android:shadowDy="2"
@@ -253,6 +252,9 @@ index c804268..a864046 100644
 -                            android:textColor="?attr/colorPrimaryContainer"
 -                            android:gravity="center"
 -                            android:text="@string/app_name_part1"/>
++                            android:textSize="36sp"
++                            android:fontFamily="sans-serif-medium"
++                            android:letterSpacing="-0.025"
 +                            android:textColor="?attr/colorOnSurface"
 +                            android:text="@string/localvault_brand"/>
                          <TextView
@@ -272,7 +274,7 @@ index c804268..a864046 100644
 -                            android:gravity="center"
 -                            android:text="@string/app_name_part2"/>
 +                            android:layout_marginTop="8dp"
-+                            android:textSize="16sp"
++                            android:textSize="15sp"
 +                            android:textColor="?attr/colorOnSurfaceVariant"
 +                            android:text="@string/localvault_vault_picker"/>
                          <TextView
@@ -297,7 +299,7 @@ index c804268..a864046 100644
                              android:gravity="center"
                              android:text="@string/app_name_part3"/>
                      </LinearLayout>
-@@ -141,10 +119,16 @@
+@@ -141,10 +120,16 @@
  
          <androidx.constraintlayout.widget.ConstraintLayout
              android:id="@+id/file_selection_buttons_container"
@@ -312,11 +314,11 @@ index c804268..a864046 100644
 +            app:layout_constraintStart_toStartOf="parent"
 +            app:layout_constraintEnd_toEndOf="parent"
 +            app:layout_constraintWidth_max="480dp"
-+            android:background="@drawable/localvault_glass">
++            android:background="@drawable/localvault_account_base">
  
              <androidx.constraintlayout.widget.Guideline
                  android:id="@+id/guideline_buttons"
-@@ -157,6 +141,7 @@
+@@ -157,6 +142,7 @@
                  android:id="@+id/create_database_button"
                  android:layout_width="0dp"
                  android:layout_height="wrap_content"
@@ -324,7 +326,7 @@ index c804268..a864046 100644
                  app:icon="@drawable/ic_database_plus_white_24dp"
                  app:iconGravity="start"
                  app:layout_constraintStart_toStartOf="parent"
-@@ -171,6 +156,7 @@
+@@ -171,6 +157,7 @@
                  android:id="@+id/open_database_button"
                  android:layout_width="0dp"
                  android:layout_height="wrap_content"
@@ -332,7 +334,7 @@ index c804268..a864046 100644
                  android:text="@string/select_database_file"
                  app:icon="@drawable/ic_folder_white_24dp"
                  app:iconGravity="start"
-@@ -185,4 +171,4 @@
+@@ -185,4 +172,4 @@
  
          <include layout="@layout/view_screenshot_mode_banner" />
      </androidx.constraintlayout.widget.ConstraintLayout>
@@ -340,10 +342,45 @@ index c804268..a864046 100644
 \ No newline at end of file
 +</FrameLayout>
 diff --git a/app/src/main/res/layout/activity_group.xml b/app/src/main/res/layout/activity_group.xml
-index a6cd927..a7eacd7 100644
+index a6cd927..2cf25e3 100644
 --- a/app/src/main/res/layout/activity_group.xml
 +++ b/app/src/main/res/layout/activity_group.xml
-@@ -92,7 +92,7 @@
+@@ -32,6 +32,16 @@
+         android:layout_width="match_parent"
+         android:layout_height="match_parent">
+ 
++        <com.kunzisoft.keepass.view.VaultBackdrop
++            android:id="@+id/vault_backdrop"
++            android:layout_width="0dp"
++            android:layout_height="0dp"
++            android:importantForAccessibility="no"
++            app:layout_constraintStart_toStartOf="parent"
++            app:layout_constraintEnd_toEndOf="parent"
++            app:layout_constraintTop_toTopOf="parent"
++            app:layout_constraintBottom_toBottomOf="parent" />
++
+         <com.kunzisoft.keepass.view.ToolbarSpecial
+             android:id="@+id/special_mode_view"
+             android:layout_width="match_parent"
+@@ -49,13 +59,16 @@
+                 android:layout_width="match_parent"
+                 android:layout_height="wrap_content"
+                 android:title="@string/app_name"
++                android:minHeight="64dp"
+                 app:layout_constraintTop_toTopOf="parent">
+                 <TextView
+                     android:id="@+id/database_name"
+                     android:layout_width="wrap_content"
+                     android:layout_height="wrap_content"
+                     android:layout_marginStart="12dp"
+-                    android:maxLines="2"
++                    android:maxLines="1"
++                    android:fontFamily="sans-serif-medium"
++                    android:textSize="22sp"
+                     android:ellipsize="end"
+                     tools:text="Database"
+                     style="@style/KeepassDXStyle.Title.OnSurface" />
+@@ -92,19 +105,22 @@
              android:id="@+id/group_coordinator"
              android:layout_width="match_parent"
              android:layout_height="0dp"
@@ -352,7 +389,36 @@ index a6cd927..a7eacd7 100644
              app:layout_constraintTop_toBottomOf="@+id/activity_group_header">
  
              <com.google.android.material.appbar.AppBarLayout
-@@ -135,7 +135,7 @@
+                 android:id="@+id/app_bar"
+                 android:layout_width="match_parent"
+-                android:layout_height="wrap_content">
++                android:layout_height="wrap_content"
++                app:elevation="0dp"
++                android:background="?attr/colorSurface">
+ 
+                 <androidx.recyclerview.widget.RecyclerView
+                     android:id="@+id/breadcrumb_list"
+                     android:layout_width="match_parent"
+-                    android:layout_height="64dp"
+-                    android:paddingHorizontal="12dp"
++                    android:layout_height="56dp"
++                    android:paddingStart="16dp"
++                    android:paddingEnd="16dp"
+                     android:background="?attr/colorSurface"
+                     app:layout_scrollFlags="scroll|snap|enterAlways"
+                     app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager"
+@@ -117,9 +133,7 @@
+                 android:layout_width="match_parent"
+                 android:layout_height="match_parent"
+                 android:orientation="vertical"
+-                app:layout_behavior="@string/appbar_scrolling_view_behavior"
+-                android:background="?android:attr/windowBackground"
+-                android:layout_below="@+id/toolbar" />
++                app:layout_behavior="@string/appbar_scrolling_view_behavior" />
+ 
+             <com.kunzisoft.keepass.view.AddNodeButtonView
+                 android:id="@+id/add_node_button"
+@@ -135,7 +149,7 @@
              android:id="@+id/search_content_view"
              android:layout_width="match_parent"
              android:layout_height="0dp"
@@ -361,7 +427,7 @@ index a6cd927..a7eacd7 100644
              app:layout_constraintTop_toBottomOf="@+id/special_mode_view" />
  
          <androidx.constraintlayout.widget.ConstraintLayout
-@@ -148,15 +148,44 @@
+@@ -148,15 +162,45 @@
                  android:id="@+id/toolbar_action"
                  android:layout_width="match_parent"
                  android:layout_height="64dp"
@@ -372,27 +438,28 @@ index a6cd927..a7eacd7 100644
 -            <include
 -                layout="@layout/view_button_lock"
 -                android:layout_width="wrap_content"
-+            <LinearLayout
++            <com.kunzisoft.keepass.view.VaultGlassBar
 +                android:id="@+id/vault_actions"
 +                android:layout_width="0dp"
                  android:layout_height="wrap_content"
-+                android:layout_marginHorizontal="16dp"
++                android:layout_marginStart="22dp"
++                android:layout_marginEnd="22dp"
 +                android:layout_marginTop="4dp"
-+                android:layout_marginBottom="10dp"
-+                android:background="@drawable/localvault_glass"
-+                android:elevation="6dp"
++                android:layout_marginBottom="12dp"
++                android:elevation="9dp"
 +                android:orientation="horizontal"
-+                android:padding="5dp"
++                android:padding="6dp"
++                android:gravity="center_vertical"
 +                android:filterTouchesWhenObscured="true"
                  app:layout_constraintBottom_toBottomOf="parent"
 -                app:layout_constraintStart_toStartOf="parent" />
 +                app:layout_constraintStart_toStartOf="parent"
 +                app:layout_constraintEnd_toEndOf="parent"
-+                app:layout_constraintWidth_max="480dp">
++                app:layout_constraintWidth_max="420dp">
 +
 +                <com.google.android.material.button.MaterialButton
 +                    android:id="@+id/vault_search_button"
-+                    style="@style/LocalVault.Action"
++                    style="@style/LocalVault.Action.Search"
 +                    android:text="@string/search"
 +                    app:icon="@drawable/ic_search_white_24dp" />
 +
@@ -407,7 +474,7 @@ index a6cd927..a7eacd7 100644
 +                    style="@style/LocalVault.Action"
 +                    android:text="@string/lock"
 +                    app:icon="@drawable/ic_lock_white_24dp" />
-+            </LinearLayout>
++            </com.kunzisoft.keepass.view.VaultGlassBar>
  
          </androidx.constraintlayout.widget.ConstraintLayout>
  
@@ -432,6 +499,98 @@ index cf7102a..bac8e9e 100644
 -</FrameLayout>
 \ No newline at end of file
 +</FrameLayout>
+diff --git a/app/src/main/res/layout/item_list_nodes_entry.xml b/app/src/main/res/layout/item_list_nodes_entry.xml
+index 89add7e..52cf901 100644
+--- a/app/src/main/res/layout/item_list_nodes_entry.xml
++++ b/app/src/main/res/layout/item_list_nodes_entry.xml
+@@ -23,16 +23,17 @@
+     xmlns:tools="http://schemas.android.com/tools"
+     android:layout_width="match_parent"
+     android:layout_height="wrap_content"
+-    android:paddingTop="@dimen/selectable_margin_top"
+-    android:paddingHorizontal="@dimen/selectable_margin_horizontal">
++    android:paddingTop="6dp"
++    android:paddingHorizontal="16dp">
+ 
+     <androidx.constraintlayout.widget.ConstraintLayout
+         android:id="@+id/node_container"
+         android:layout_width="0dp"
+-        android:layout_height="match_parent"
++        android:layout_height="wrap_content"
+         android:layout_gravity="center_vertical"
+-        android:minHeight="@dimen/selectable_min_height"
++        android:minHeight="68dp"
+         style="@style/KeepassDXStyle.Selectable.Item"
++        android:background="@drawable/localvault_account_surface"
+         app:layout_constraintBottom_toBottomOf="parent"
+         app:layout_constraintEnd_toEndOf="parent"
+         app:layout_constraintStart_toStartOf="parent"
+@@ -66,6 +67,8 @@
+             android:layout_marginEnd="12dp"
+             android:layout_marginRight="12dp"
+             android:orientation="vertical"
++            android:paddingTop="10dp"
++            android:paddingBottom="10dp"
+             app:layout_constraintBottom_toTopOf="@+id/node_path"
+             app:layout_constraintEnd_toStartOf="@+id/node_options"
+             app:layout_constraintLeft_toRightOf="@+id/node_icon"
+@@ -76,6 +79,7 @@
+             <androidx.appcompat.widget.AppCompatTextView
+                 android:id="@+id/node_text"
+                 style="@style/KeepassDXStyle.Title.Entry"
++                android:fontFamily="sans-serif-medium"
+                 android:layout_width="wrap_content"
+                 android:layout_height="wrap_content"
+                 android:ellipsize="end"
+@@ -87,7 +91,7 @@
+                 style="@style/KeepassDXStyle.SubTitle.Entry"
+                 android:layout_width="wrap_content"
+                 android:layout_height="wrap_content"
+-                android:layout_marginTop="-4dp"
++                android:layout_marginTop="2dp"
+                 android:lines="1"
+                 android:singleLine="true"
+                 tools:text="Node SubTitle" />
+diff --git a/app/src/main/res/layout/item_list_nodes_group.xml b/app/src/main/res/layout/item_list_nodes_group.xml
+index 356d981..90ed39b 100644
+--- a/app/src/main/res/layout/item_list_nodes_group.xml
++++ b/app/src/main/res/layout/item_list_nodes_group.xml
+@@ -23,16 +23,17 @@
+     xmlns:tools="http://schemas.android.com/tools"
+     android:layout_width="match_parent"
+     android:layout_height="wrap_content"
+-    android:paddingTop="@dimen/selectable_margin_top"
+-    android:paddingHorizontal="@dimen/selectable_margin_horizontal">
++    android:paddingTop="6dp"
++    android:paddingHorizontal="16dp">
+ 
+     <RelativeLayout
+         android:id="@+id/node_container"
+         android:layout_width="0dp"
+         android:layout_height="match_parent"
+         android:layout_gravity="center_vertical"
+-        android:minHeight="@dimen/selectable_min_height"
++        android:minHeight="62dp"
+         style="@style/KeepassDXStyle.Selectable.Item"
++        android:background="@drawable/localvault_account_surface"
+         app:layout_constraintWidth_percent="@dimen/content_percent"
+         app:layout_constraintTop_toTopOf="parent"
+         app:layout_constraintBottom_toBottomOf="parent"
+@@ -82,6 +83,7 @@
+             <androidx.appcompat.widget.AppCompatTextView
+                 android:id="@+id/node_text"
+                 style="@style/KeepassDXStyle.Title.Group"
++                android:fontFamily="sans-serif-medium"
+                 android:layout_width="wrap_content"
+                 android:layout_height="wrap_content"
+                 android:ellipsize="end"
+@@ -120,4 +122,4 @@
+             android:layout_marginRight="12dp"
+             android:src="@drawable/ic_arrow_right_white_24dp" />
+     </RelativeLayout>
+-</androidx.constraintlayout.widget.ConstraintLayout>
+\ No newline at end of file
++</androidx.constraintlayout.widget.ConstraintLayout>
 diff --git a/app/src/main/res/values-sv/strings.xml b/app/src/main/res/values-sv/strings.xml
 index f3825d9..4395df6 100644
 --- a/app/src/main/res/values-sv/strings.xml
@@ -445,6 +604,129 @@ index f3825d9..4395df6 100644
      <string name="error_string_key">Varje sträng måste ha ett fältnamn.</string>
      <string name="error_wrong_length">Ange ett positivt heltal i fältet \"Längd\".</string>
      <string name="field_name">Fältnamn</string>
+diff --git a/app/src/main/res/values/colors.xml b/app/src/main/res/values/colors.xml
+index 49bdd17..3280fa1 100644
+--- a/app/src/main/res/values/colors.xml
++++ b/app/src/main/res/values/colors.xml
+@@ -122,15 +122,15 @@
+     <!-- Themes colors -->
+     <!-- Forest -->
+ 
+-    <color name="forest_theme_light_primary">@color/green</color>
+-    <color name="forest_theme_light_primaryDark">@color/green_whitest</color>
+-    <color name="forest_theme_light_onPrimary">@color/white</color>
+-    <color name="forest_theme_light_primaryContainer">@color/green</color>
+-    <color name="forest_theme_light_onPrimaryContainer">@color/white</color>
+-    <color name="forest_theme_light_secondary">@color/orange_dark</color>
+-    <color name="forest_theme_light_onSecondary">@color/white</color>
+-    <color name="forest_theme_light_secondaryContainer">@color/orange_dark</color>
+-    <color name="forest_theme_light_onSecondaryContainer">@color/white</color>
++    <color name="forest_theme_light_primary">#444FB2</color>
++    <color name="forest_theme_light_primaryDark">#EFF0FA</color>
++    <color name="forest_theme_light_onPrimary">#FFFFFF</color>
++    <color name="forest_theme_light_primaryContainer">#E1E4FF</color>
++    <color name="forest_theme_light_onPrimaryContainer">#1C235C</color>
++    <color name="forest_theme_light_secondary">#535D8E</color>
++    <color name="forest_theme_light_onSecondary">#FFFFFF</color>
++    <color name="forest_theme_light_secondaryContainer">#E2E7FF</color>
++    <color name="forest_theme_light_onSecondaryContainer">#222C55</color>
+     <color name="forest_theme_light_tertiary">#835500</color>
+     <color name="forest_theme_light_onTertiary">#FFFFFF</color>
+     <color name="forest_theme_light_tertiaryContainer">#FFDDB4</color>
+@@ -139,31 +139,31 @@
+     <color name="forest_theme_light_errorContainer">#FFDAD6</color>
+     <color name="forest_theme_light_onError">#FFFFFF</color>
+     <color name="forest_theme_light_onErrorContainer">#410002</color>
+-    <color name="forest_theme_light_background">#F8FFF8</color>
+-    <color name="forest_theme_light_onBackground">#1A1C19</color>
+-    <color name="forest_theme_light_surface">#E5F6E4</color>
+-    <color name="forest_theme_light_onSurface">#3C423A</color>
+-    <color name="forest_theme_light_surfaceContainerLowest">#E3F3E2</color>
+-    <color name="forest_theme_light_surfaceContainerLow">#E2F4E1</color>
+-    <color name="forest_theme_light_surfaceContainer">#DCF1DB</color>
+-    <color name="forest_theme_light_surfaceContainerHigh">#D7EFD6</color>
+-    <color name="forest_theme_light_surfaceContainerHighest">#D2ECD1</color>
+-    <color name="forest_theme_light_surfaceVariant">#DEE5D8</color>
+-    <color name="forest_theme_light_onSurfaceVariant">#424940</color>
+-    <color name="forest_theme_light_outline">#72796F</color>
+-    <color name="forest_theme_light_inverseOnSurface">#F0F1EB</color>
+-    <color name="forest_theme_light_inverseSurface">#2F312D</color>
+-    <color name="forest_theme_light_inversePrimary">#7DDC7A</color>
+-
+-    <color name="forest_theme_night_primary">@color/green</color>
+-    <color name="forest_theme_night_primaryDark">#1A251C</color>
+-    <color name="forest_theme_night_onPrimary">@color/white</color>
+-    <color name="forest_theme_night_primaryContainer">@color/green</color>
+-    <color name="forest_theme_night_onPrimaryContainer">@color/white</color>
+-    <color name="forest_theme_night_secondary">@color/orange</color>
+-    <color name="forest_theme_night_onSecondary">@color/green_black_light</color>
+-    <color name="forest_theme_night_secondaryContainer">@color/orange</color>
+-    <color name="forest_theme_night_onSecondaryContainer">@color/green_black_light</color>
++    <color name="forest_theme_light_background">#FAFAFF</color>
++    <color name="forest_theme_light_onBackground">#1A1C2C</color>
++    <color name="forest_theme_light_surface">#F8F8FF</color>
++    <color name="forest_theme_light_onSurface">#1A1C2C</color>
++    <color name="forest_theme_light_surfaceContainerLowest">#FFFFFF</color>
++    <color name="forest_theme_light_surfaceContainerLow">#F4F4FC</color>
++    <color name="forest_theme_light_surfaceContainer">#EFF0FA</color>
++    <color name="forest_theme_light_surfaceContainerHigh">#E9EBF5</color>
++    <color name="forest_theme_light_surfaceContainerHighest">#E4E6F0</color>
++    <color name="forest_theme_light_surfaceVariant">#E4E7F3</color>
++    <color name="forest_theme_light_onSurfaceVariant">#464A61</color>
++    <color name="forest_theme_light_outline">#72788D</color>
++    <color name="forest_theme_light_inverseOnSurface">#F2F1FA</color>
++    <color name="forest_theme_light_inverseSurface">#303041</color>
++    <color name="forest_theme_light_inversePrimary">#BCC3FF</color>
++
++    <color name="forest_theme_night_primary">#BDC4FF</color>
++    <color name="forest_theme_night_primaryDark">#141724</color>
++    <color name="forest_theme_night_onPrimary">#242B70</color>
++    <color name="forest_theme_night_primaryContainer">#353E89</color>
++    <color name="forest_theme_night_onPrimaryContainer">#E1E4FF</color>
++    <color name="forest_theme_night_secondary">#BFC7F8</color>
++    <color name="forest_theme_night_onSecondary">#292E51</color>
++    <color name="forest_theme_night_secondaryContainer">#343D64</color>
++    <color name="forest_theme_night_onSecondaryContainer">#E2E7FF</color>
+     <color name="forest_theme_night_tertiary">#FFB953</color>
+     <color name="forest_theme_night_onTertiary">#452B00</color>
+     <color name="forest_theme_night_tertiaryContainer">#633F00</color>
+@@ -172,21 +172,21 @@
+     <color name="forest_theme_night_errorContainer">#93000A</color>
+     <color name="forest_theme_night_onError">#690005</color>
+     <color name="forest_theme_night_onErrorContainer">#FFDAD6</color>
+-    <color name="forest_theme_night_background">#182219</color>
+-    <color name="forest_theme_night_onBackground">#E2E3DD</color>
+-    <color name="forest_theme_night_surface">#1A251C</color>
+-    <color name="forest_theme_night_onSurface">#E2E3DD</color>
+-    <color name="forest_theme_night_surfaceContainerLowest">#27332A</color>
+-    <color name="forest_theme_night_surfaceContainerLow">#223025</color>
+-    <color name="forest_theme_night_surfaceContainer">#212f24</color>
+-    <color name="forest_theme_night_surfaceContainerHigh">#1D2C21</color>
+-    <color name="forest_theme_night_surfaceContainerHighest">#1B2B1E</color>
+-    <color name="forest_theme_night_surfaceVariant">#424940</color>
+-    <color name="forest_theme_night_onSurfaceVariant">#C2C9BD</color>
+-    <color name="forest_theme_night_outline">#8C9388</color>
+-    <color name="forest_theme_night_inverseOnSurface">#1A1C19</color>
+-    <color name="forest_theme_night_inverseSurface">#E2E3DD</color>
+-    <color name="forest_theme_night_inversePrimary">#006E1C</color>
++    <color name="forest_theme_night_background">#111421</color>
++    <color name="forest_theme_night_onBackground">#E4E5F3</color>
++    <color name="forest_theme_night_surface">#141724</color>
++    <color name="forest_theme_night_onSurface">#E4E5F3</color>
++    <color name="forest_theme_night_surfaceContainerLowest">#0E1120</color>
++    <color name="forest_theme_night_surfaceContainerLow">#191E30</color>
++    <color name="forest_theme_night_surfaceContainer">#202538</color>
++    <color name="forest_theme_night_surfaceContainerHigh">#282E44</color>
++    <color name="forest_theme_night_surfaceContainerHighest">#32384D</color>
++    <color name="forest_theme_night_surfaceVariant">#363B50</color>
++    <color name="forest_theme_night_onSurfaceVariant">#BFCAE1</color>
++    <color name="forest_theme_night_outline">#898FA8</color>
++    <color name="forest_theme_night_inverseOnSurface">#272B3D</color>
++    <color name="forest_theme_night_inverseSurface">#E4E5F3</color>
++    <color name="forest_theme_night_inversePrimary">#464FB0</color>
+ 
+     <!-- Classic -->
+ 
 diff --git a/app/src/main/res/values/donottranslate.xml b/app/src/main/res/values/donottranslate.xml
 index 1a4d416..56b224a 100644
 --- a/app/src/main/res/values/donottranslate.xml
@@ -679,34 +961,239 @@ index 0000000..2a79322
 +        }
 +    }
 +}
-diff --git a/app/src/main/res/drawable/localvault_glass.xml b/app/src/main/res/drawable/localvault_glass.xml
+diff --git a/app/src/main/java/com/kunzisoft/keepass/view/VaultBackdrop.kt b/app/src/main/java/com/kunzisoft/keepass/view/VaultBackdrop.kt
 new file mode 100644
-index 0000000..f8ca069
+index 0000000..831dbdc
 --- /dev/null
-+++ b/app/src/main/res/drawable/localvault_glass.xml
-@@ -0,0 +1,9 @@
++++ b/app/src/main/java/com/kunzisoft/keepass/view/VaultBackdrop.kt
+@@ -0,0 +1,50 @@
++// SPDX-License-Identifier: GPL-3.0-or-later
++package com.kunzisoft.keepass.view
++
++import android.content.Context
++import android.graphics.Canvas
++import android.graphics.Color
++import android.graphics.LinearGradient
++import android.graphics.Paint
++import android.graphics.RadialGradient
++import android.graphics.Shader
++import android.util.AttributeSet
++import android.view.View
++import androidx.core.graphics.ColorUtils
++import com.google.android.material.color.MaterialColors
++import com.google.android.material.R as MaterialR
++
++/**
++ * Decorative layer shared by the vault surface and the dock lens.
++ * It contains no child views, vault entries or user images.
++ */
++class VaultBackdrop(context: Context, attrs: AttributeSet? = null) : View(context, attrs) {
++    private val surface = MaterialColors.getColor(this, MaterialR.attr.colorSurface)
++    private val primary = MaterialColors.getColor(this, MaterialR.attr.colorPrimary)
++    internal val dark = ColorUtils.calculateLuminance(surface) < 0.32
++    private val base = Paint()
++    private val glow = Paint()
++    private val reflection = Paint()
++
++    override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
++        super.onSizeChanged(w, h, oldw, oldh)
++        val density = resources.displayMetrics.density
++        val horizon = (h - 110 * density).coerceAtLeast(0f)
++        val accent = ColorUtils.blendARGB(surface, primary, if (dark) .32f else .37f)
++        val coolLight = ColorUtils.blendARGB(surface, Color.rgb(150, 208, 249), if (dark) .21f else .38f)
++        base.shader = LinearGradient(0f, horizon, 0f, h.toFloat(), surface,
++            ColorUtils.blendARGB(surface, primary, .10f), Shader.TileMode.CLAMP)
++        glow.shader = RadialGradient(w * .14f, h - 20 * density, maxOf(w * .62f, 1f), accent,
++            ColorUtils.setAlphaComponent(accent, 0), Shader.TileMode.CLAMP)
++        reflection.shader = RadialGradient(w * .83f, h - 48 * density, maxOf(w * .48f, 1f), coolLight,
++            ColorUtils.setAlphaComponent(coolLight, 0), Shader.TileMode.CLAMP)
++    }
++
++    override fun onDraw(canvas: Canvas) = drawSurface(canvas)
++
++    internal fun drawSurface(canvas: Canvas) {
++        canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), base)
++        canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), glow)
++        canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), reflection)
++    }
++}
+diff --git a/app/src/main/java/com/kunzisoft/keepass/view/VaultGlassBar.kt b/app/src/main/java/com/kunzisoft/keepass/view/VaultGlassBar.kt
+new file mode 100644
+index 0000000..491fcc9
+--- /dev/null
++++ b/app/src/main/java/com/kunzisoft/keepass/view/VaultGlassBar.kt
+@@ -0,0 +1,138 @@
++// SPDX-License-Identifier: GPL-3.0-or-later
++package com.kunzisoft.keepass.view
++
++import android.content.Context
++import android.graphics.Canvas
++import android.graphics.Color
++import android.graphics.LinearGradient
++import android.graphics.Outline
++import android.graphics.Paint
++import android.graphics.Path
++import android.graphics.RectF
++import android.graphics.RenderEffect
++import android.graphics.RenderNode
++import android.graphics.RuntimeShader
++import android.graphics.Shader
++import android.os.Build
++import android.util.AttributeSet
++import android.view.View
++import android.view.ViewOutlineProvider
++import android.widget.LinearLayout
++import androidx.annotation.RequiresApi
++import com.kunzisoft.keepass.R
++
++class VaultGlassBar(context: Context, attrs: AttributeSet? = null) : LinearLayout(context, attrs) {
++    private val density = resources.displayMetrics.density
++    private val fill = Paint(Paint.ANTI_ALIAS_FLAG)
++    private val bevel = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
++    private val capsule = Path()
++    private val bounds = RectF()
++    private val location = IntArray(2)
++    private val sourceLocation = IntArray(2)
++    private val opticalLayer = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) OpticalLayer() else null
++
++    init {
++        setWillNotDraw(false)
++        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
++            useCapsuleOutline()
++        }
++    }
++
++    @RequiresApi(Build.VERSION_CODES.LOLLIPOP)
++    private fun useCapsuleOutline() {
++        outlineProvider = object : ViewOutlineProvider() {
++            override fun getOutline(view: View, outline: Outline) {
++                outline.setRoundRect(0, 0, view.width, view.height, view.height / 2f)
++                outline.alpha = .55f
++            }
++        }
++    }
++
++    override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
++        super.onSizeChanged(w, h, oldw, oldh)
++        bounds.set(.6f * density, .6f * density, w - .6f * density, h - .6f * density)
++        capsule.rewind()
++        capsule.addRoundRect(bounds, h / 2f, h / 2f, Path.Direction.CW)
++        bevel.strokeWidth = 1.2f * density
++        bevel.shader = LinearGradient(w * .24f, 0f, w * .71f, h.toFloat(),
++            intArrayOf(0xEFFFFFFF.toInt(), 0x26FFFFFF, 0x637384AC, 0xA9FFFFFF.toInt()),
++            floatArrayOf(0f, .32f, .64f, 1f), Shader.TileMode.CLAMP)
++    }
++
++    override fun onDraw(canvas: Canvas) {
++        super.onDraw(canvas)
++        val source = rootView.findViewById<VaultBackdrop>(R.id.vault_backdrop)
++        val dark = source?.dark == true
++        val drawOptics = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
++                canvas.isHardwareAccelerated && source != null && source.isLaidOut
++        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && drawOptics) {
++            getLocationInWindow(location)
++            source.getLocationInWindow(sourceLocation)
++            canvas.save()
++            canvas.clipPath(capsule)
++            opticalLayer?.draw(canvas, source, location[0] - sourceLocation[0], location[1] - sourceLocation[1])
++            canvas.restore()
++        }
++        fill.color = when {
++            dark && drawOptics -> 0x5F171D2C
++            dark -> 0xEA202738.toInt()
++            drawOptics -> 0x73FFFFFF
++            else -> 0xF5F5F8FF.toInt()
++        }
++        canvas.drawPath(capsule, fill)
++        canvas.drawRoundRect(bounds, height / 2f, height / 2f, bevel)
++    }
++
++    @RequiresApi(Build.VERSION_CODES.S)
++    private inner class OpticalLayer {
++        private val node = RenderNode("LocalVault decorative lens")
++        private var lastGeometry: List<Int>? = null
++
++        fun draw(canvas: Canvas, source: VaultBackdrop, x: Int, y: Int) {
++            val geometry = listOf(width, height, source.width, source.height, x, y)
++            if (geometry != lastGeometry) {
++                lastGeometry = geometry
++                node.setPosition(0, 0, width, height)
++                val recording = node.beginRecording()
++                recording.translate(-x.toFloat(), -y.toFloat())
++                source.drawSurface(recording)
++                node.endRecording()
++                val blur = RenderEffect.createBlurEffect(9 * density, 9 * density, Shader.TileMode.CLAMP)
++                node.setRenderEffect(if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
++                    makeLens(blur)
++                } else {
++                    blur
++                })
++            }
++            canvas.drawRenderNode(node)
++        }
++    }
++
++    @RequiresApi(Build.VERSION_CODES.TIRAMISU)
++    private fun makeLens(blur: RenderEffect): RenderEffect {
++        val lens = RuntimeShader(LENS)
++        lens.setFloatUniform("size", width.toFloat(), height.toFloat())
++        val warp = RenderEffect.createRuntimeShaderEffect(lens, "backdrop")
++        return RenderEffect.createChainEffect(warp, blur)
++    }
++
++    private companion object {
++        // The curved edge pulls the decorative backdrop inward. Text and icons are
++        // ordinary child views drawn afterward and stay sharp.
++        const val LENS = """
++            uniform shader backdrop;
++            uniform float2 size;
++
++            half4 main(float2 point) {
++                float2 center = point - size * 0.5;
++                float radius = size.y * 0.5;
++                float2 normal = center;
++                normal.x -= clamp(normal.x, -size.x * 0.5 + radius, size.x * 0.5 - radius);
++                float distance = length(normal);
++                float edge = smoothstep(radius * 0.60, radius, distance);
++                float2 inward = normal * (0.34 * edge * edge);
++                return backdrop.eval(point - inward);
++            }
++        """
++    }
++}
+diff --git a/app/src/main/res/drawable-v21/localvault_account_surface.xml b/app/src/main/res/drawable-v21/localvault_account_surface.xml
+new file mode 100644
+index 0000000..984b1da
+--- /dev/null
++++ b/app/src/main/res/drawable-v21/localvault_account_surface.xml
+@@ -0,0 +1,5 @@
++<?xml version="1.0" encoding="utf-8"?>
++<ripple xmlns:android="http://schemas.android.com/apk/res/android"
++    android:color="?attr/colorControlHighlight">
++    <item android:drawable="@drawable/localvault_account_base" />
++</ripple>
+diff --git a/app/src/main/res/drawable/localvault_account_base.xml b/app/src/main/res/drawable/localvault_account_base.xml
+new file mode 100644
+index 0000000..9365b10
+--- /dev/null
++++ b/app/src/main/res/drawable/localvault_account_base.xml
+@@ -0,0 +1,5 @@
 +<?xml version="1.0" encoding="utf-8"?>
 +<shape xmlns:android="http://schemas.android.com/apk/res/android">
-+    <corners android:radius="26dp" />
-+    <gradient
-+        android:angle="270"
-+        android:startColor="@color/localvault_glass_light"
-+        android:endColor="@color/localvault_glass_shade" />
-+    <stroke android:width="1dp" android:color="@color/localvault_glass_edge" />
++    <corners android:radius="17dp" />
++    <solid android:color="?attr/colorSurfaceContainerLow" />
 +</shape>
-diff --git a/app/src/main/res/values-night/localvault_appearance.xml b/app/src/main/res/values-night/localvault_appearance.xml
+diff --git a/app/src/main/res/drawable/localvault_account_surface.xml b/app/src/main/res/drawable/localvault_account_surface.xml
 new file mode 100644
-index 0000000..1887db1
+index 0000000..9365b10
 --- /dev/null
-+++ b/app/src/main/res/values-night/localvault_appearance.xml
-@@ -0,0 +1,7 @@
++++ b/app/src/main/res/drawable/localvault_account_surface.xml
+@@ -0,0 +1,5 @@
 +<?xml version="1.0" encoding="utf-8"?>
-+<resources>
-+    <color name="localvault_glass_light">#F038475D</color>
-+    <color name="localvault_glass_shade">#F01A2436</color>
-+    <color name="localvault_glass_edge">#C37F96B5</color>
-+    <color name="localvault_action_text">#E3EEFF</color>
-+</resources>
++<shape xmlns:android="http://schemas.android.com/apk/res/android">
++    <corners android:radius="17dp" />
++    <solid android:color="?attr/colorSurfaceContainerLow" />
++</shape>
 diff --git a/app/src/main/res/values-zh-rCN/localvault.xml b/app/src/main/res/values-zh-rCN/localvault.xml
 new file mode 100644
 index 0000000..2a05e7b
@@ -775,15 +1262,12 @@ index 0000000..4a02b99
 +</resources>
 diff --git a/app/src/main/res/values/localvault_appearance.xml b/app/src/main/res/values/localvault_appearance.xml
 new file mode 100644
-index 0000000..e92e54e
+index 0000000..93805d3
 --- /dev/null
 +++ b/app/src/main/res/values/localvault_appearance.xml
-@@ -0,0 +1,23 @@
+@@ -0,0 +1,30 @@
 +<?xml version="1.0" encoding="utf-8"?>
 +<resources xmlns:tools="http://schemas.android.com/tools">
-+    <color name="localvault_glass_light">#F8FFFFFF</color>
-+    <color name="localvault_glass_shade">#F0E1EBF6</color>
-+    <color name="localvault_glass_edge">#AD9BB0CD</color>
 +    <string name="localvault_more" tools:ignore="MissingTranslation">Vault menu</string>
 +    <string name="localvault_brand" translatable="false">LocalVault</string>
 +    <string name="localvault_vault_picker" tools:ignore="MissingTranslation">Choose or create a password vault</string>
@@ -791,16 +1275,26 @@ index 0000000..e92e54e
 +        <item name="android:layout_width">0dp</item>
 +        <item name="android:layout_height">wrap_content</item>
 +        <item name="android:layout_weight">1</item>
-+        <item name="android:minHeight">55dp</item>
++        <item name="android:minHeight">52dp</item>
 +        <item name="android:paddingStart">2dp</item>
 +        <item name="android:paddingEnd">2dp</item>
-+        <item name="android:textColor">@color/localvault_action_text</item>
-+        <item name="iconTint">@color/localvault_action_text</item>
++        <item name="android:fontFamily">sans-serif-medium</item>
++        <item name="android:textSize">12sp</item>
++        <item name="android:textColor">?attr/colorOnSurface</item>
++        <item name="iconTint">?attr/colorOnSurface</item>
 +        <item name="iconSize">20dp</item>
 +        <item name="iconPadding">3dp</item>
 +        <item name="iconGravity">textTop</item>
++        <item name="cornerRadius">26dp</item>
++        <item name="android:insetTop">0dp</item>
++        <item name="android:insetBottom">0dp</item>
 +    </style>
-+    <color name="localvault_action_text">#183353</color>
++    <style name="LocalVault.Action.Search" parent="LocalVault.Action">
++        <item name="android:layout_marginEnd">3dp</item>
++        <item name="backgroundTint">?attr/colorSecondaryContainer</item>
++        <item name="iconTint">?attr/colorOnSecondaryContainer</item>
++        <item name="android:textColor">?attr/colorOnSecondaryContainer</item>
++    </style>
 +</resources>
 diff --git a/app/src/test/java/com/kunzisoft/keepass/settings/DeviceSetupActivityTest.kt b/app/src/test/java/com/kunzisoft/keepass/settings/DeviceSetupActivityTest.kt
 new file mode 100644
